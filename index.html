@@ -342,10 +342,16 @@ function renderAuth(mode){
 /* ============================================================ APP */
 async function loadAndShow(){
   app.innerHTML=`<div class="center-load"><div class="spin"></div><span>Loading your library…</span></div>`;
-  try{
-    const prof=await sb.from("profiles").select("is_admin").eq("id",state.user.id).single();
-    state.isAdmin=!!(prof.data && prof.data.is_admin);
-  }catch{ state.isAdmin=false; }
+  let prof=null;
+  try{ const r=await sb.from("profiles").select("is_admin,banned").eq("id",state.user.id).single(); prof=r.data; }catch{ prof=null; }
+  if(!prof || prof.banned){
+    await sb.auth.signOut();
+    state.user=null; state.items=[]; state.isAdmin=false;
+    renderAuth("login");
+    setTimeout(()=>{ const m=$("#aMsg"); if(m){ m.textContent="This account is no longer active."; m.className="msg err"; } },50);
+    return;
+  }
+  state.isAdmin=!!prof.is_admin;
   try{
     const { data,error }=await sb.from("media").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false});
     state.items=error?[]:(data||[]);
@@ -431,6 +437,12 @@ async function renderDashboard(c){
     const e=el(`<div class="empty"><div class="big">Your vault is empty</div><div style="margin-bottom:18px">Upload your first files to get started.</div><button class="btn btn-blue" style="width:auto;padding:11px 22px">Upload media</button></div>`);
     e.querySelector("button").onclick=()=>{state.view="upload";renderView();}; c.appendChild(e);
   }else{ const g=el(`<div class="grid"></div>`); items.slice(0,8).forEach(m=>g.appendChild(tileNode(m))); c.appendChild(g); }
+  const danger=el(`<div style="margin-top:42px;border-top:1px solid var(--hair);padding-top:20px">
+    <div style="font-size:11.5px;color:var(--faint);margin-bottom:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">Account</div>
+    <button class="btn-sm del" id="selfDel">${IC.trash} Delete my account</button>
+    <div style="font-size:12px;color:var(--faint);margin-top:8px">Permanently removes your account and all your media.</div></div>`);
+  danger.querySelector("#selfDel").onclick=selfDeleteAccount;
+  c.appendChild(danger);
 }
 
 function renderLibrary(c){
@@ -515,15 +527,45 @@ async function renderAdmin(c){
   profiles.forEach(p=>{
     const mine=byUser[p.id]||[];
     const used=mine.reduce((s,m)=>s+(m.size||0),0);
+    const isSelf=p.id===state.user.id;
+    const tag=p.is_admin?" · admin":(p.banned?" · banned":"");
     const card=el(`<div class="admin-user">
-      <div class="ahead"><div><div class="an">${esc(p.username||"(no name)")}${p.is_admin?" · admin":""}</div><div class="ae">${esc(p.email||"")}</div></div>
+      <div class="ahead"><div><div class="an">${esc(p.username||"(no name)")}${tag}</div><div class="ae">${esc(p.email||"")}</div></div>
         <div class="acount">${mine.length} item${mine.length!==1?"s":""} · ${fmtBytes(used)}</div></div></div>`);
-    const grid=el(`<div class="agrid grid" style="display:none"></div>`);
-    mine.forEach(m=>grid.appendChild(tileNode(m,{readOnly:p.id!==state.user.id})));
+    if(!isSelf){
+      const act=el(`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn-sm aban">${p.banned?"Unban":"Ban"}</button>
+        <button class="btn-sm del adel">${IC.trash} Delete account</button></div>`);
+      act.querySelector(".aban").onclick=()=>adminSetBanned(p.id,!p.banned);
+      act.querySelector(".adel").onclick=()=>{ if(window.confirm("Delete "+(p.email||"this")+" account and ALL their media? This cannot be undone.")) adminDeleteAccount(p,mine); };
+      card.appendChild(act);
+    }
+    const grid=el(`<div class="agrid grid" style="display:none;margin-top:14px"></div>`);
+    mine.forEach(m=>grid.appendChild(tileNode(m,{readOnly:!isSelf})));
     card.appendChild(grid);
     card.querySelector(".ahead").onclick=()=>{ grid.style.display=grid.style.display==="none"?"grid":"none"; };
     wrap.appendChild(card);
   });
+}
+
+async function adminSetBanned(userId,banned){
+  try{ await sb.from("profiles").update({banned}).eq("id",userId); }catch{}
+  renderView();
+}
+async function adminDeleteAccount(p,mine){
+  const paths=(mine||[]).map(m=>m.storage_path).filter(Boolean);
+  try{ if(paths.length) await sb.storage.from(BUCKET).remove(paths); }catch{}
+  try{ await sb.from("media").delete().eq("user_id",p.id); }catch{}
+  try{ await sb.from("profiles").update({banned:true}).eq("id",p.id); }catch{}
+  renderView();
+}
+async function selfDeleteAccount(){
+  if(!window.confirm("Delete YOUR account and all your media permanently? This cannot be undone.")) return;
+  const paths=state.items.map(m=>m.storage_path).filter(Boolean);
+  try{ if(paths.length) await sb.storage.from(BUCKET).remove(paths); }catch{}
+  try{ await sb.from("media").delete().eq("user_id",state.user.id); }catch{}
+  try{ await sb.from("profiles").delete().eq("id",state.user.id); }catch{}
+  await sb.auth.signOut();
 }
 
 /* ---------------- detail ---------------- */
