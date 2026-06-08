@@ -219,7 +219,7 @@ img{display:block}
 .soc:active{transform:translateY(1px)}
 .soc.x{background:#fff;color:#000;border:1px solid #fff}
 .soc.x:hover{filter:brightness(.92)}
-.soc.ig{color:#fff;border:1px solid rgba(255,255,255,.08);background:linear-gradient(95deg,#7a3fb0,#c1359d 35%,#e84a52 65%,#f0a04b)}
+.soc.ig{color:#fff;border:none;background:linear-gradient(135deg,#8a3ab9 0%,#c1358e 30%,#e85a4f 60%,#f3a14b 100%)}
 .soc.ig:hover{filter:brightness(1.07)}
 .soc svg{width:18px;height:18px}
 .ft-copy{margin-top:22px;font-size:14px;color:var(--faint)}
@@ -575,14 +575,18 @@ async function maybeShowBanner(){
   let b=null;
   try{ const r=await sb.from("banners").select("*").eq("active",true).order("created_at",{ascending:false}).limit(1); b=(r.data&&r.data[0])||null; }catch(e){ b=null; }
   if(!b) return;
-  let seen=false; try{ seen=sessionStorage.getItem("mv_banner_"+b.id)==="1"; }catch(e){}
+  // has THIS user already acknowledged THIS banner? (stored per-user, permanently)
+  let seen=false;
+  try{ const r=await sb.from("banner_seen").select("banner_id").eq("user_id",state.user.id).eq("banner_id",b.id).maybeSingle(); seen=!!(r&&r.data); }catch(e){ seen=false; }
   if(seen) return;
-  try{ sessionStorage.setItem("mv_banner_"+b.id,"1"); }catch(e){}
   showBannerModal(b);
+}
+async function markBannerSeen(b){
+  try{ await sb.from("banner_seen").upsert({ user_id:state.user.id, banner_id:b.id }, { onConflict:"user_id,banner_id" }); }catch(e){}
 }
 function bannerMediaUrl(b){ if(!b.media_path) return null; try{ return sb.storage.from(BANNER_BUCKET).getPublicUrl(b.media_path).data.publicUrl; }catch(e){ return null; } }
 function showBannerModal(b){
-  const { bg, close }=overlay({});
+  const { bg, close }=overlay({dismissable:false});   // only the buttons close it, so "seen" is always recorded
   const url=bannerMediaUrl(b);
   let mediaWrap="";
   if(url && b.media_type==="video")
@@ -607,8 +611,9 @@ function showBannerModal(b){
     else { m.onloadeddata=reveal; m.oncanplay=reveal; m.onerror=reveal; }
     setTimeout(reveal,4000); // never get stuck on a slow network
   }
-  sheet.querySelectorAll(".modal-x").forEach(x=>x.onclick=close);
-  sheet.querySelector("#bnOk").onclick=close;
+  const dismiss=()=>{ markBannerSeen(b); close(); };
+  sheet.querySelectorAll(".modal-x").forEach(x=>x.onclick=dismiss);
+  sheet.querySelector("#bnOk").onclick=dismiss;
 }
 
 /* ============================================================ SHELL */
