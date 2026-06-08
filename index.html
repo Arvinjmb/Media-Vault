@@ -69,8 +69,9 @@ img{display:block}
 /* ---------- topbar ---------- */
 .topbar{position:sticky;top:0;z-index:20;-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);background:rgba(10,12,15,.72);border-bottom:1px solid var(--hair)}
 .topbar-in{max-width:1200px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.top-brand{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;font-size:20px;display:flex;align-items:center;gap:11px}
-.top-brand .tbadge{width:34px;height:34px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.5))}
+.top-brand{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;font-size:20px;display:flex;align-items:center;gap:10px}
+.top-brand .tbadge{width:36px;height:36px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,.5))}
+.top-brand .bw{white-space:nowrap}
 .top-brand .v{color:var(--accent)}
 .user-chip{display:flex;align-items:center;gap:10px}
 .user-chip .who{font-size:13px;color:var(--muted);text-align:right;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -116,6 +117,10 @@ img{display:block}
 .tile:hover .name,.tile.show-name .name{opacity:1;transform:none}
 .badge{position:absolute;top:9px;right:9px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px}
 .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(10,12,15,.45);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.7)}
+.tile.pick .pickmark{position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:rgba(10,12,15,.55);border:1.5px solid rgba(255,255,255,.75);color:#fff;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.7);transition:.15s;z-index:2}
+.tile.pick.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.tile.pick.sel .pickmark{opacity:1;transform:none;background:var(--accent);border-color:var(--accent);color:#1c1606}
+.tile.pick.sel .name{opacity:1;transform:none}
 
 .empty{border:1.5px dashed var(--line-2);border-radius:18px;padding:60px 20px;text-align:center;color:var(--muted);background:rgba(255,255,255,.015)}
 .empty .big{font-family:var(--disp);font-size:21px;color:var(--text);margin-bottom:6px;font-weight:600;letter-spacing:-.01em}
@@ -197,7 +202,8 @@ img{display:block}
 .step-dots i{width:7px;height:7px;border-radius:50%;background:var(--line-2)} .step-dots i.on{background:var(--accent);box-shadow:0 0 8px var(--accent)}
 
 /* entry banner */
-.bn-media{width:100%;max-height:46svh;border-radius:16px 16px 0 0;object-fit:cover;background:#050608;display:block}
+.bn-mediawrap{position:relative;background:#050608;min-height:170px;display:flex;align-items:center;justify-content:center;border-radius:16px 16px 0 0;overflow:hidden}
+.bn-media{width:100%;max-height:46svh;border-radius:16px 16px 0 0;object-fit:cover;background:#050608;display:block;transition:opacity .35s}
 .bn-body{padding:24px 26px calc(24px + var(--safe-b))}
 .bn-title{font-family:var(--disp);font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .bn-text{color:var(--muted);font-size:14.5px;line-height:1.6;white-space:pre-wrap}
@@ -253,7 +259,7 @@ img{display:block}
 </head>
 <body>
 <div id="app"><div class="splash">
-  <div class="lg"><svg viewBox="0 0 60 54" width="104" height="104" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <div class="lg"><svg viewBox="3 2 54 54" width="104" height="104" xmlns="http://www.w3.org/2000/svg" fill="none">
    <defs><linearGradient id="agboot" x1="0" y1="0" x2="0" y2="1">
      <stop offset="0" stop-color="#f6e6b8"/><stop offset=".5" stop-color="#dcb863"/><stop offset="1" stop-color="#c19a3d"/></linearGradient></defs>
    <g stroke="url(#agboot)" stroke-linecap="round" stroke-linejoin="round">
@@ -341,7 +347,7 @@ function videoThumb(blob,max=480){return new Promise(res=>{const url=URL.createO
 /* ---------------- Aurea logo (gold cloud + vault "A" + dial) ---------------- */
 function vaultLogo(px,sfx){
   sfx=sfx||"a";
-  return `<svg viewBox="0 0 60 54" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" fill="none">
+  return `<svg viewBox="3 2 54 54" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" fill="none">
    <defs><linearGradient id="ag${sfx}" x1="0" y1="0" x2="0" y2="1">
      <stop offset="0" stop-color="#f6e6b8"/><stop offset=".5" stop-color="#dcb863"/><stop offset="1" stop-color="#c19a3d"/></linearGradient></defs>
    <g stroke="url(#ag${sfx})" stroke-linecap="round" stroke-linejoin="round">
@@ -370,6 +376,7 @@ const IC={
   out:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   edit:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   plus:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  check:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
   back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>',
   x:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
   ig:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/></svg>',
@@ -576,11 +583,15 @@ function bannerMediaUrl(b){ if(!b.media_path) return null; try{ return sb.storag
 function showBannerModal(b){
   const { bg, close }=overlay({});
   const url=bannerMediaUrl(b);
-  let media="";
-  if(url && b.media_type==="video") media=`<video class="bn-media" src="${url}" controls autoplay playsinline></video>`;
-  else if(url && b.media_type==="image") media=`<img class="bn-media" src="${url}" alt="">`;
+  let mediaWrap="";
+  if(url && b.media_type==="video")
+    mediaWrap=`<div class="bn-mediawrap"><div class="modal-load" id="bnLoad"><div class="spin"></div></div><video class="bn-media" id="bnMedia" src="${url}" controls playsinline preload="metadata" style="opacity:0"></video><button class="modal-x">${IC.closex}</button></div>`;
+  else if(url && b.media_type==="image")
+    mediaWrap=`<div class="bn-mediawrap"><div class="modal-load" id="bnLoad"><div class="spin"></div></div><img class="bn-media" id="bnMedia" src="${url}" alt="" decoding="async" style="opacity:0"><button class="modal-x">${IC.closex}</button></div>`;
+  else
+    mediaWrap=`<div style="position:relative;height:8px"><button class="modal-x" style="top:10px">${IC.closex}</button></div>`;
   const sheet=el(`<div class="modal" style="max-width:560px">
-    <div style="position:relative">${media}<button class="modal-x">${IC.closex}</button></div>
+    ${mediaWrap}
     <div class="bn-body">
       ${b.title?`<div class="bn-title">${esc(b.title)}</div>`:""}
       ${b.body?`<div class="bn-text">${esc(b.body)}</div>`:""}
@@ -588,7 +599,14 @@ function showBannerModal(b){
       <div style="margin-top:18px"><button class="btn btn-blue" id="bnOk">Got it</button></div>
     </div></div>`);
   bg.appendChild(sheet);
-  sheet.querySelector(".modal-x").onclick=close;
+  const m=sheet.querySelector("#bnMedia"), load=sheet.querySelector("#bnLoad");
+  if(m){
+    const reveal=()=>{ m.style.opacity="1"; if(load) load.remove(); };
+    if(b.media_type==="image"){ m.onload=reveal; m.onerror=reveal; if(m.complete) reveal(); }
+    else { m.onloadeddata=reveal; m.oncanplay=reveal; m.onerror=reveal; }
+    setTimeout(reveal,4000); // never get stuck on a slow network
+  }
+  sheet.querySelectorAll(".modal-x").forEach(x=>x.onclick=close);
   sheet.querySelector("#bnOk").onclick=close;
 }
 
@@ -617,7 +635,7 @@ function navTabs(){ const t=["dashboard","upload","library","albums","settings"]
 function renderShell(){
   app.innerHTML="";
   app.appendChild(el(`<div class="topbar"><div class="topbar-in">
-    <div class="top-brand"><span class="tbadge">${vaultLogo(34,"top")}</span> Aur<span class="v">ea</span></div>
+    <div class="top-brand"><span class="tbadge">${vaultLogo(36,"top")}</span><span class="bw">Aur<span class="v">ea</span></span></div>
     <div class="user-chip"><span class="who">${esc(username())}</span><button class="logout" id="logout">${IC.out} Sign out</button></div>
   </div></div>`));
   app.appendChild(el(`<div class="shell"><div class="nav" id="nav"></div><div id="content"></div></div>`));
@@ -739,15 +757,53 @@ function renderAlbums(c){
   c.appendChild(grid);
 }
 function renderAlbumDetail(c,a){
-  const head=el(`<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-    <button class="btn-sm" id="bAlbums">${IC.back} Albums</button></div>`);
+  const head=el(`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+    <button class="btn-sm" id="bAlbums">${IC.back} Albums</button>
+    <button class="btn-sm dl" id="bAdd">${IC.plus} Add media</button></div>`);
   c.appendChild(head);
   $("#bAlbums").onclick=()=>{ state.albumView=null; renderView(); };
+  $("#bAdd").onclick=()=>openAlbumPicker(a);
   c.appendChild(el(`<h1 class="page-h">${esc(a.name)}</h1>`));
   const mine=state.items.filter(m=>m.album_id===a.id);
-  c.appendChild(el(`<p class="page-sub">${mine.length} item${mine.length!==1?"s":""} · add items from any file's window using “Album”.</p>`));
-  if(!mine.length){ c.appendChild(el(`<div class="empty"><div class="big">This album is empty</div><div>Open any file and pick this album under “Album” to add it here.</div></div>`)); return; }
+  c.appendChild(el(`<p class="page-sub">${mine.length} item${mine.length!==1?"s":""} · tap “Add media” to add several at once. Open any item to remove it.</p>`));
+  if(!mine.length){ const e=el(`<div class="empty"><div class="big">This album is empty</div><div style="margin-bottom:18px">Add photos, videos or files to this album.</div><button class="btn btn-blue" style="width:auto;padding:11px 22px">Add media</button></div>`); e.querySelector("button").onclick=()=>openAlbumPicker(a); c.appendChild(e); return; }
   const g=el(`<div class="grid"></div>`); mine.forEach(m=>g.appendChild(tileNode(m,{canEdit:true}))); c.appendChild(g);
+}
+function openAlbumPicker(a){
+  const { bg, close }=overlay({});
+  const candidates=state.items; // all of the user's media; ones already in this album are pre-checked
+  const sel=new Set(state.items.filter(m=>m.album_id===a.id).map(m=>m.id));
+  const modal=el(`<div class="modal" style="max-width:880px">
+    <div class="modal-foot" style="border-bottom:1px solid var(--hair)"><div class="m-meta"><div class="mn"><span class="mtitle">Add to “${esc(a.name)}”</span></div><div class="md" id="pkCount"></div></div>
+      <div class="m-actions"><button class="btn-sm" id="pkX">Cancel</button><button class="btn-sm dl" id="pkSave">Save</button></div></div>
+    <div style="overflow:auto;padding:16px;max-height:64svh"><div class="grid" id="pkGrid"></div></div></div>`);
+  bg.appendChild(modal);
+  const grid=modal.querySelector("#pkGrid");
+  const updCount=()=>{ modal.querySelector("#pkCount").textContent=sel.size+" selected"; };
+  if(!candidates.length){ grid.replaceWith(el(`<div class="empty" style="margin:0"><div class="big">No media yet</div><div>Upload some files first, then add them here.</div></div>`)); }
+  else candidates.forEach(m=>{
+    let inner;
+    if((m.type==="image"||m.type==="video") && m.thumb) inner=`<img src="${m.thumb}" alt="${esc(m.name)}" loading="lazy">`;
+    else inner=`<div class="kind">${m.type==="audio"?IC.audio:IC.file}<span class="ext">${esc(extOf(m.name))}</span></div>`;
+    const t=el(`<div class="tile pick${sel.has(m.id)?" sel":""}">${inner}<div class="pickmark">${IC.check}</div>${m.type==="video"?`<div class="badge">${IC.vid}</div>`:""}<div class="grad"></div><div class="name">${esc(m.name)}</div></div>`);
+    t.onclick=()=>{ if(sel.has(m.id)) sel.delete(m.id); else sel.add(m.id); t.classList.toggle("sel"); updCount(); };
+    grid.appendChild(t);
+  });
+  updCount();
+  modal.querySelector("#pkX").onclick=close;
+  modal.querySelector("#pkSave").onclick=async()=>{
+    const btn=modal.querySelector("#pkSave"); btn.disabled=true; btn.textContent="Saving…";
+    const want=sel, add=[], remove=[];
+    state.items.forEach(m=>{
+      const inAlbum=m.album_id===a.id, picked=want.has(m.id);
+      if(picked && !inAlbum) add.push(m.id);
+      if(!picked && inAlbum) remove.push(m.id);
+    });
+    try{ if(add.length) await sb.from("media").update({album_id:a.id}).in("id",add); }catch(e){}
+    try{ if(remove.length) await sb.from("media").update({album_id:null}).in("id",remove); }catch(e){}
+    state.items.forEach(m=>{ if(add.includes(m.id)) m.album_id=a.id; if(remove.includes(m.id)) m.album_id=null; });
+    close(); renderView();
+  };
 }
 function createAlbumFlow(){
   const { bg, close }=overlay({});
