@@ -217,10 +217,10 @@ img{display:block}
 .ft-socials{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
 .soc{display:inline-flex;align-items:center;gap:9px;padding:11px 20px;border-radius:24px;font-weight:700;font-size:14px;transition:transform .07s,filter .15s}
 .soc:active{transform:translateY(1px)}
-.soc.x{background:#fff;color:#000;border:1px solid #fff}
-.soc.x:hover{filter:brightness(.92)}
-.soc.ig{color:#fff;border:none;background:linear-gradient(135deg,#8a3ab9 0%,#c1358e 30%,#e85a4f 60%,#f3a14b 100%)}
-.soc.ig:hover{filter:brightness(1.07)}
+.soc.x{background:linear-gradient(180deg,#23272f,#161a20);color:#fff;border:1px solid var(--line-2);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.soc.x:hover{background:linear-gradient(180deg,#2a2f38,#1c2128)}
+.soc.ig{background:linear-gradient(180deg,#23272f,#161a20);color:var(--text);border:1px solid var(--line-2);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.soc.ig:hover{background:linear-gradient(180deg,#2a2f38,#1c2128)}
 .soc svg{width:18px;height:18px}
 .ft-copy{margin-top:22px;font-size:14px;color:var(--faint)}
 .ft-rights{max-width:640px;margin:14px auto 0;font-size:13px;line-height:1.6;color:var(--faint)}
@@ -380,6 +380,7 @@ const IC={
   back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>',
   x:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
   ig:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  igGrad:'<svg viewBox="0 0 24 24"><defs><linearGradient id="iggrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fdd574"/><stop offset=".42" stop-color="#e8513f"/><stop offset=".68" stop-color="#d62976"/><stop offset="1" stop-color="#7b34c9"/></linearGradient></defs><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.6" fill="none" stroke="url(#iggrad)" stroke-width="2.1"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="url(#iggrad)" stroke-width="2.1"/><circle cx="17.7" cy="6.3" r="1.35" fill="url(#iggrad)"/></svg>',
   mail:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 7 9-7"/></svg>',
   closex:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
 };
@@ -572,6 +573,7 @@ async function loadAndShow(){
 
 /* ============================================================ ENTRY BANNER */
 async function maybeShowBanner(){
+  if(state.isAdmin) return;   // the owner doesn't get the pop-up; they review banners in Control
   let b=null;
   try{ const r=await sb.from("banners").select("*").eq("active",true).order("created_at",{ascending:false}).limit(1); b=(r.data&&r.data[0])||null; }catch(e){ b=null; }
   if(!b) return;
@@ -585,8 +587,10 @@ async function markBannerSeen(b){
   try{ await sb.from("banner_seen").upsert({ user_id:state.user.id, banner_id:b.id }, { onConflict:"user_id,banner_id" }); }catch(e){}
 }
 function bannerMediaUrl(b){ if(!b.media_path) return null; try{ return sb.storage.from(BANNER_BUCKET).getPublicUrl(b.media_path).data.publicUrl; }catch(e){ return null; } }
-function showBannerModal(b){
-  const { bg, close }=overlay({dismissable:false});   // only the buttons close it, so "seen" is always recorded
+function showBannerModal(b,opts){
+  opts=opts||{};
+  const preview=!!opts.preview;   // preview = owner reviewing; don't record "seen", allow tap-to-close
+  const { bg, close }=overlay({dismissable:preview});
   const url=bannerMediaUrl(b);
   let mediaWrap="";
   if(url && b.media_type==="video")
@@ -601,7 +605,7 @@ function showBannerModal(b){
       ${b.title?`<div class="bn-title">${esc(b.title)}</div>`:""}
       ${b.body?`<div class="bn-text">${esc(b.body)}</div>`:""}
       <div class="bn-sign">Arvin</div>
-      <div style="margin-top:18px"><button class="btn btn-blue" id="bnOk">Got it</button></div>
+      <div style="margin-top:18px"><button class="btn btn-blue" id="bnOk">${preview?"Close":"Got it"}</button></div>
     </div></div>`);
   bg.appendChild(sheet);
   const m=sheet.querySelector("#bnMedia"), load=sheet.querySelector("#bnLoad");
@@ -611,7 +615,7 @@ function showBannerModal(b){
     else { m.onloadeddata=reveal; m.oncanplay=reveal; m.onerror=reveal; }
     setTimeout(reveal,4000); // never get stuck on a slow network
   }
-  const dismiss=()=>{ markBannerSeen(b); close(); };
+  const dismiss=()=>{ if(!preview) markBannerSeen(b); close(); };
   sheet.querySelectorAll(".modal-x").forEach(x=>x.onclick=dismiss);
   sheet.querySelector("#bnOk").onclick=dismiss;
 }
@@ -628,7 +632,7 @@ function footerNode(){
     <div class="ft-role">🔒 ${esc(OWNER.role)}</div>
     <div class="ft-socials">
       <a class="soc x" href="${OWNER.x}" target="_blank" rel="noopener">${IC.x} ${esc(OWNER.xHandle)}</a>
-      <a class="soc ig" href="${OWNER.ig}" target="_blank" rel="noopener">${IC.ig} ${esc(OWNER.igHandle)}</a>
+      <a class="soc ig" href="${OWNER.ig}" target="_blank" rel="noopener">${IC.igGrad} ${esc(OWNER.igHandle)}</a>
     </div>
     <div class="ft-copy">© 2026 ${esc(OWNER.name)} · All Rights Reserved</div>
     <div class="ft-rights">This website was created, designed, and published by ${esc(OWNER.name)}. Unauthorized reproduction, copying, or distribution of any content on this site is strictly prohibited.</div>
@@ -1029,7 +1033,6 @@ function renderSettings(c){
   /* ---- password ---- */
   const pcard=el(`<div class="admin-card" style="max-width:520px">
     <div class="section-h"><h3>Password</h3></div>
-    <div class="field"><label>Current password</label><input id="pwOld" type="password" placeholder="••••••••"></div>
     <div class="field"><label>New password</label><input id="pwNew" type="password" placeholder="At least 6 characters"></div>
     <div class="field"><label>Confirm new password</label><input id="pwNew2" type="password" placeholder="••••••••"></div>
     <div class="msg" id="pwMsg"></div>
@@ -1038,20 +1041,14 @@ function renderSettings(c){
   c.appendChild(pcard);
   const pmsg=(t,cls)=>{ const m=pcard.querySelector("#pwMsg"); m.textContent=t; m.className="msg"+(cls?" "+cls:""); };
   pcard.querySelector("#pwSave").onclick=async()=>{
-    const oldp=pcard.querySelector("#pwOld").value, np=pcard.querySelector("#pwNew").value, np2=pcard.querySelector("#pwNew2").value;
-    if(!oldp){ pmsg("Enter your current password.","err"); return; }
+    const np=pcard.querySelector("#pwNew").value, np2=pcard.querySelector("#pwNew2").value;
     if(np.length<6){ pmsg("New password must be at least 6 characters.","err"); return; }
     if(np!==np2){ pmsg("The new passwords don't match.","err"); return; }
-    if(np===oldp){ pmsg("Your new password is the same as the current one.","err"); return; }
-    const btn=pcard.querySelector("#pwSave"); btn.disabled=true; btn.textContent="Checking…"; pmsg("");
+    const btn=pcard.querySelector("#pwSave"); btn.disabled=true; btn.textContent="Updating…"; pmsg("");
     try{
-      // verify the current password first
-      const chk=await sb.auth.signInWithPassword({ email:state.user.email, password:oldp });
-      if(chk.error){ btn.disabled=false; btn.textContent="Change password"; return pmsg("Your current password is incorrect.","err"); }
-      btn.textContent="Updating…";
       const up=await sb.auth.updateUser({ password:np });
       if(up.error){ btn.disabled=false; btn.textContent="Change password"; return pmsg(friendlyErr(up.error),"err"); }
-      pcard.querySelector("#pwOld").value=""; pcard.querySelector("#pwNew").value=""; pcard.querySelector("#pwNew2").value="";
+      pcard.querySelector("#pwNew").value=""; pcard.querySelector("#pwNew2").value="";
       btn.disabled=false; btn.textContent="Change password";
       pmsg("Your password has been changed.","ok");
     }catch(e){ btn.disabled=false; btn.textContent="Change password"; pmsg("Something went wrong. Try again.","err"); }
@@ -1180,13 +1177,16 @@ function bindBannerManager(root){
     if(!rows.length){ list.appendChild(el(`<div style="font-size:13px;color:var(--faint)">No banners yet.</div>`)); return; }
     rows.forEach(b=>{
       const row=el(`<div class="banner-row">
-        <div class="bt"><div class="b1">${esc(b.title||"(no title)")}</div><div class="b2">${esc((b.body||"").slice(0,80))||"—"}${b.media_path?" · media":""}</div></div>
+        <div class="bt" style="cursor:pointer"><div class="b1">${esc(b.title||"(no title)")}</div><div class="b2">${esc((b.body||"").slice(0,80))||"—"}${b.media_path?" · tap to view media":""}</div></div>
         <button class="pillstate ${b.active?"on":"off"}">${b.active?"Active":"Off"}</button>
+        <button class="btn-sm bedit">${IC.edit}</button>
         <button class="btn-sm del">${IC.trash}</button></div>`);
+      row.querySelector(".bt").onclick=()=>showBannerModal(b,{preview:true});
       row.querySelector(".pillstate").onclick=async()=>{
         try{ if(!b.active){ await sb.from("banners").update({active:false}).eq("active",true); } await sb.from("banners").update({active:!b.active}).eq("id",b.id); }catch(e){}
         refreshList();
       };
+      row.querySelector(".bedit").onclick=()=>editBannerFlow(b,refreshList);
       row.querySelector(".btn-sm.del").onclick=async()=>{
         try{ if(b.media_path) await sb.storage.from(BANNER_BUCKET).remove([b.media_path]); await sb.from("banners").delete().eq("id",b.id); }catch(e){}
         refreshList();
@@ -1219,6 +1219,47 @@ function bindBannerManager(root){
     }catch(e){ btn.disabled=false; btn.textContent="Publish banner"; msg("Something went wrong. Try again.","err"); }
   };
   refreshList();
+}
+
+function editBannerFlow(b, refresh){
+  const { bg, close }=overlay({});
+  const sheet=el(`<div class="sheet"><h2>Edit banner</h2>
+    <div class="field"><label>Title</label><input id="ebTitle" maxlength="120" value="${esc(b.title||"")}"></div>
+    <div class="field"><label>Message</label><textarea id="ebBody" rows="3" maxlength="1000">${esc(b.body||"")}</textarea></div>
+    <div class="field"><label>Media</label>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">${b.media_path?("Current: a "+(b.media_type||"file")+" is attached."):"No media attached."}</div>
+      <input id="ebFile" type="file" accept="image/*,video/*">
+      ${b.media_path?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted)"><input type="checkbox" id="ebRemove" style="width:auto"> Remove current media</label>`:""}
+    </div>
+    <div class="msg" id="ebMsg"></div>
+    <div class="sheet-actions"><button class="btn btn-metal" id="ebCancel">Cancel</button><button class="btn btn-blue" id="ebSave">Save</button></div></div>`);
+  bg.appendChild(sheet);
+  const emsg=(t,cls)=>{ const m=sheet.querySelector("#ebMsg"); m.textContent=t; m.className="msg"+(cls?" "+cls:""); };
+  sheet.querySelector("#ebCancel").onclick=close;
+  sheet.querySelector("#ebSave").onclick=async()=>{
+    const title=sheet.querySelector("#ebTitle").value.trim();
+    const body=sheet.querySelector("#ebBody").value.trim();
+    const file=sheet.querySelector("#ebFile").files[0];
+    const removeChk=sheet.querySelector("#ebRemove");
+    const remove=removeChk?removeChk.checked:false;
+    const btn=sheet.querySelector("#ebSave"); btn.disabled=true; btn.textContent="Saving…"; emsg("");
+    let media_path=b.media_path, media_type=b.media_type;
+    try{
+      if(file){
+        const ext=extOf(file.name); const path=uuid()+(ext?"."+ext:"");
+        const up=await sb.storage.from(BANNER_BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false,cacheControl:"3600"});
+        if(up.error){ btn.disabled=false; btn.textContent="Save"; emsg("Couldn't upload the media. "+(up.error.message||""),"err"); return; }
+        if(b.media_path){ try{ await sb.storage.from(BANNER_BUCKET).remove([b.media_path]); }catch(e){} }
+        media_path=path; media_type=categorize(file.type);
+      } else if(remove && b.media_path){
+        try{ await sb.storage.from(BANNER_BUCKET).remove([b.media_path]); }catch(e){}
+        media_path=null; media_type=null;
+      }
+      const upd=await sb.from("banners").update({ title:title||null, body:body||null, media_path, media_type }).eq("id",b.id);
+      if(upd.error){ btn.disabled=false; btn.textContent="Save"; emsg("Couldn't save. "+(upd.error.message||""),"err"); return; }
+      close(); if(refresh) refresh();
+    }catch(e){ btn.disabled=false; btn.textContent="Save"; emsg("Something went wrong. Try again.","err"); }
+  };
 }
 
 async function adminSetBanned(userId,banned){
