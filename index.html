@@ -306,7 +306,7 @@ const SITE_MAX_GB       = 10;    // Cloudflare R2 free tier = 10 GB total — th
 const ADMIN_CAP_GB      = 5;     // owner account: a fixed 5 GB, separate from members
 const MEMBER_POOL_GB    = 5;     // all members SHARE this 5 GB, divided evenly between them (adaptive)
 const SAFETY_GB         = 0.2;   // small buffer so the site can never tip over 10 GB and get charged
-const MAX_FILE_MB       = 2048;  // generous per-file ceiling (R2 has no 50 MB limit)
+const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the Worker, under Cloudflare's 100 MB request size)
 const BUCKET            = "media";      // legacy/unused for media now (files live in R2)
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
@@ -419,21 +419,23 @@ const memberUsed=()=> (state.stats&&state.stats.member_used)||0;
 const adminUsed=()=> (state.stats&&state.stats.admin_used)||0;
 const siteUsedBytes=()=> memberUsed()+adminUsed();
 
-/* ---- Cloudflare R2 storage (via the doorman Worker) ---- */
+/* ---- Storage via the doorman Worker (everything proxied through Cloudflare) ---- */
 async function r2Token(){ try{ const { data:{ session } }=await sb.auth.getSession(); return session?session.access_token:null; }catch(e){ return null; } }
-async function r2Presign(op, key, contentType){
-  const token=await r2Token(); if(!token) throw new Error("Not signed in");
-  const r=await fetch(R2_WORKER_URL+"/presign",{ method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+token }, body:JSON.stringify({ op, key, contentType:contentType||null }) });
-  if(!r.ok) throw new Error("presign "+r.status);
-  const j=await r.json(); if(!j.url) throw new Error("no url"); return j.url;
-}
 async function r2Delete(key){
   try{ const token=await r2Token(); if(!token) return; await fetch(R2_WORKER_URL+"/delete",{ method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+token }, body:JSON.stringify({ key }) }); }catch(e){}
 }
-function xhrPut(url, file, contentType, onprogress){
+async function r2GetObjectURL(key){
+  const token=await r2Token(); if(!token) throw new Error("not signed in");
+  const r=await fetch(R2_WORKER_URL+"/get?key="+encodeURIComponent(key), { headers:{ "Authorization":"Bearer "+token } });
+  if(!r.ok) throw new Error("get "+r.status);
+  const b=await r.blob(); return URL.createObjectURL(b);
+}
+function xhrUpload(key, file, contentType, token, onprogress){
   return new Promise((resolve,reject)=>{
-    const x=new XMLHttpRequest(); x.open("PUT", url, true);
-    x.timeout=180000;
+    const x=new XMLHttpRequest();
+    x.open("PUT", R2_WORKER_URL+"/put?key="+encodeURIComponent(key), true);
+    x.timeout=600000;
+    x.setRequestHeader("Authorization","Bearer "+token);
     if(contentType) x.setRequestHeader("Content-Type", contentType);
     x.upload.onprogress=(e)=>{ if(e.lengthComputable && onprogress) onprogress(e.loaded/e.total); };
     x.onload=()=>{ (x.status>=200 && x.status<300)?resolve():reject(new Error("PUT "+x.status)); };
@@ -1045,12 +1047,11 @@ async function processUpload(j){
     setJob(j,30,"uploading","");
     const id=uuid(); const path=`${state.user.id}/${id}`;
     const ct=f.type||"application/octet-stream";
-    let putUrl;
-    try{ putUrl=await r2Presign("put", path, ct); }catch(e){ setJob(j,0,"link failed ("+(e&&e.message||"?")+")","err"); return; }
+    const token=await r2Token(); if(!token){ setJob(j,0,"please sign in again","err"); return; }
     let putErr=null;
     for(let attempt=1; attempt<=2; attempt++){
-      try{ await xhrPut(putUrl, f, ct, (frac)=>setJob(j, 30+Math.round(frac*55), attempt>1?"retrying":"uploading","")); putErr=null; break; }
-      catch(e){ putErr=e; if(attempt<2){ setJob(j,30,"retrying",""); try{ putUrl=await r2Presign("put", path, ct); }catch(_){} } }
+      try{ await xhrUpload(path, f, ct, token, (frac)=>setJob(j, 30+Math.round(frac*55), attempt>1?"retrying":"uploading","")); putErr=null; break; }
+      catch(e){ putErr=e; if(attempt<2) setJob(j,30,"retrying",""); }
     }
     if(putErr){ setJob(j,0,"upload failed ("+(putErr.message||"?")+")","err"); return; }
     setJob(j,90,"saving","");
@@ -1115,9 +1116,11 @@ function openDetail(m,canEdit){
       <div class="m-actions">${albumSel}<button class="btn-sm dl" disabled>${IC.dl} Download</button>${canEdit?`<button class="btn-sm del">${IC.trash} Delete</button>`:""}</div></div></div>`);
   bg.appendChild(modal);
   const stage=modal.querySelector(".modal-stage"), dlBtn=modal.querySelector(".dl"), delBtn=modal.querySelector(".del");
-  modal.querySelector(".modal-x").onclick=close;
+  const closeAndFree=()=>{ try{ if(modal._objURL) URL.revokeObjectURL(modal._objURL); }catch(e){} close(); };
+  modal.querySelector(".modal-x").onclick=closeAndFree;
 
-  r2Presign("get", m.storage_path).then((url)=>{
+  r2GetObjectURL(m.storage_path).then((url)=>{
+    modal._objURL=url;
     const ld=stage.querySelector(".modal-load"); if(ld) ld.remove();
     let node;
     if(m.type==="video") node=el(`<video src="${url}" controls autoplay playsinline ${m.thumb?`poster="${m.thumb}"`:""}></video>`);
