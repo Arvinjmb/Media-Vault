@@ -399,7 +399,7 @@ async function boot(){
   sb.auth.onAuthStateChange((ev,sess)=>{
     if(ev==="PASSWORD_RECOVERY"){ state.user=sess?sess.user:state.user; renderRecovery(); return; }
     if(sess && !state.user){ state.user=sess.user; loadAndShow(); }
-    else if(!sess && state.user){ state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false; renderAuth("login"); }
+    else if(!sess && state.user){ state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false; state.uploads=[]; state.albumView=null; _uploadRunning=0; renderAuth("login"); }
   });
   if(hash.includes("type=recovery")) return;
   try{
@@ -547,6 +547,7 @@ function renderRecovery(){
 /* ============================================================ LOAD */
 async function loadAndShow(){
   app.innerHTML=splashHTML();
+  state.uploads=[]; state.albumView=null; _uploadRunning=0;   // start clean for this account
   let prof=null;
   try{ const r=await sb.from("profiles").select("is_admin,banned").eq("id",state.user.id).single(); prof=r.data; }catch(e){ prof=null; }
   if(!prof || prof.banned){
@@ -699,14 +700,6 @@ function renderDashboard(c){
     const e=el(`<div class="empty"><div class="big">Your vault is empty</div><div style="margin-bottom:18px">Upload your first files to get started.</div><button class="btn btn-blue" style="width:auto;padding:11px 22px">Upload media</button></div>`);
     e.querySelector("button").onclick=()=>{state.view="upload";renderView();}; c.appendChild(e);
   }else{ const g=el(`<div class="grid"></div>`); items.slice(0,8).forEach(m=>g.appendChild(tileNode(m,{canEdit:true}))); c.appendChild(g); }
-  if(!state.isAdmin){
-    const danger=el(`<div style="margin-top:42px;border-top:1px solid var(--hair);padding-top:20px">
-      <div style="font-size:11px;color:var(--faint);margin-bottom:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase">Account</div>
-      <button class="btn-sm del" id="selfDel">${IC.trash} Delete my account</button>
-      <div style="font-size:12px;color:var(--faint);margin-top:8px">Permanently removes your account and all your media.</div></div>`);
-    danger.querySelector("#selfDel").onclick=selfDeleteFlow;
-    c.appendChild(danger);
-  }
 }
 
 /* ============================================================ LIBRARY */
@@ -1058,6 +1051,16 @@ function renderSettings(c){
       pmsg("Your password has been changed.","ok");
     }catch(e){ btn.disabled=false; btn.textContent="Change password"; pmsg("Something went wrong. Try again.","err"); }
   };
+
+  /* ---- delete account (members only; the owner account can't be deleted) ---- */
+  if(!state.isAdmin){
+    const dcard=el(`<div class="admin-card" style="max-width:520px;border-color:rgba(255,91,98,.3)">
+      <div class="section-h"><h3 style="color:var(--danger)">Delete account</h3></div>
+      <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 14px">Permanently removes your account and all your media. You won't be able to reuse this email.</p>
+      <button class="btn-sm del" id="stDel">${IC.trash} Delete my account</button></div>`);
+    c.appendChild(dcard);
+    dcard.querySelector("#stDel").onclick=selfDeleteFlow;
+  }
 }
 
 /* ============================================================ ACCOUNT DELETION (user: 3 steps, password at step 2) */
