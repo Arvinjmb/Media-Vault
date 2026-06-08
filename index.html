@@ -992,18 +992,21 @@ function openDetail(m,canEdit){
   };
 }
 
-/* ============================================================ SETTINGS (edit name; email stays) */
+/* ============================================================ SETTINGS (edit name + change password; email stays) */
 function renderSettings(c){
   const md=(state.user&&state.user.user_metadata)||{};
   const first=md.first_name||"", last=md.last_name||"";
   c.appendChild(el(`<h1 class="page-h">Settings</h1>`));
-  c.appendChild(el(`<p class="page-sub">Update your name. Your email stays the same.</p>`));
+  c.appendChild(el(`<p class="page-sub">Update your name or password. Your email stays the same.</p>`));
+
+  /* ---- name ---- */
   const card=el(`<div class="admin-card" style="max-width:520px">
+    <div class="section-h"><h3>Your name</h3></div>
     <div class="field"><label>First name</label><input id="stFirst" autocomplete="given-name" value="${esc(first)}" placeholder="First name"></div>
     <div class="field"><label>Last name</label><input id="stLast" autocomplete="family-name" value="${esc(last)}" placeholder="Last name"></div>
     <div class="field"><label>Email (can't be changed)</label><input id="stEmail" value="${esc(state.user.email||"")}" disabled style="opacity:.6"></div>
     <div class="msg" id="stMsg"></div>
-    <button class="btn btn-blue" id="stSave" style="width:auto;padding:11px 24px">Save changes</button>
+    <button class="btn btn-blue" id="stSave" style="width:auto;padding:11px 24px">Save name</button>
   </div>`);
   c.appendChild(card);
   const msg=(t,cls)=>{ const m=card.querySelector("#stMsg"); m.textContent=t; m.className="msg"+(cls?" "+cls:""); };
@@ -1014,13 +1017,46 @@ function renderSettings(c){
     const btn=card.querySelector("#stSave"); btn.disabled=true; btn.textContent="Saving…"; msg("");
     try{
       const up=await sb.auth.updateUser({ data:{ username:full, first_name:f, last_name:l } });
-      if(up.error){ btn.disabled=false; btn.textContent="Save changes"; return msg(friendlyErr(up.error),"err"); }
-      try{ await sb.from("profiles").update({ first_name:f, last_name:l, username:full }).eq("id",state.user.id); }catch(e){}
+      if(up.error){ btn.disabled=false; btn.textContent="Save name"; return msg(friendlyErr(up.error),"err"); }
+      // keep the profiles row in sync so it shows everywhere (incl. the owner's account list)
+      const pr=await sb.from("profiles").update({ first_name:f, last_name:l, username:full }).eq("id",state.user.id);
       state.user.user_metadata=Object.assign({},state.user.user_metadata,{ username:full, first_name:f, last_name:l });
       const who=document.querySelector(".user-chip .who"); if(who) who.textContent=username();
-      btn.disabled=false; btn.textContent="Save changes";
-      msg("Saved. Your name has been updated.","ok");
-    }catch(e){ btn.disabled=false; btn.textContent="Save changes"; msg("Something went wrong. Try again.","err"); }
+      btn.disabled=false; btn.textContent="Save name";
+      if(pr&&pr.error) msg("Name saved for sign-in, but syncing failed: "+(pr.error.message||"")+". Try again.","err");
+      else msg("Saved. Your name has been updated.","ok");
+    }catch(e){ btn.disabled=false; btn.textContent="Save name"; msg("Something went wrong. Try again.","err"); }
+  };
+
+  /* ---- password ---- */
+  const pcard=el(`<div class="admin-card" style="max-width:520px">
+    <div class="section-h"><h3>Password</h3></div>
+    <div class="field"><label>Current password</label><input id="pwOld" type="password" placeholder="••••••••"></div>
+    <div class="field"><label>New password</label><input id="pwNew" type="password" placeholder="At least 6 characters"></div>
+    <div class="field"><label>Confirm new password</label><input id="pwNew2" type="password" placeholder="••••••••"></div>
+    <div class="msg" id="pwMsg"></div>
+    <button class="btn btn-blue" id="pwSave" style="width:auto;padding:11px 24px">Change password</button>
+  </div>`);
+  c.appendChild(pcard);
+  const pmsg=(t,cls)=>{ const m=pcard.querySelector("#pwMsg"); m.textContent=t; m.className="msg"+(cls?" "+cls:""); };
+  pcard.querySelector("#pwSave").onclick=async()=>{
+    const oldp=pcard.querySelector("#pwOld").value, np=pcard.querySelector("#pwNew").value, np2=pcard.querySelector("#pwNew2").value;
+    if(!oldp){ pmsg("Enter your current password.","err"); return; }
+    if(np.length<6){ pmsg("New password must be at least 6 characters.","err"); return; }
+    if(np!==np2){ pmsg("The new passwords don't match.","err"); return; }
+    if(np===oldp){ pmsg("Your new password is the same as the current one.","err"); return; }
+    const btn=pcard.querySelector("#pwSave"); btn.disabled=true; btn.textContent="Checking…"; pmsg("");
+    try{
+      // verify the current password first
+      const chk=await sb.auth.signInWithPassword({ email:state.user.email, password:oldp });
+      if(chk.error){ btn.disabled=false; btn.textContent="Change password"; return pmsg("Your current password is incorrect.","err"); }
+      btn.textContent="Updating…";
+      const up=await sb.auth.updateUser({ password:np });
+      if(up.error){ btn.disabled=false; btn.textContent="Change password"; return pmsg(friendlyErr(up.error),"err"); }
+      pcard.querySelector("#pwOld").value=""; pcard.querySelector("#pwNew").value=""; pcard.querySelector("#pwNew2").value="";
+      btn.disabled=false; btn.textContent="Change password";
+      pmsg("Your password has been changed.","ok");
+    }catch(e){ btn.disabled=false; btn.textContent="Change password"; pmsg("Something went wrong. Try again.","err"); }
   };
 }
 
