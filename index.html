@@ -390,19 +390,22 @@ const state={ user:null, isAdmin:false, items:[], albums:[], view:"dashboard", u
 const username=()=> (state.user&&state.user.user_metadata&&state.user.user_metadata.username) || (state.user&&state.user.email) || "";
 const myQuotaGB=()=> state.isAdmin?ADMIN_QUOTA_GB:PER_USER_QUOTA_GB;
 const myQuota=()=> myQuotaGB()*1024*1024*1024;
+let recoveryMode=false;
 
 /* ============================================================ BOOT */
 async function boot(){
   if(!configured){ renderConfigNeeded(); return; }
   // password-recovery deep link?
   const hash=location.hash||"";
-  if(hash.includes("type=recovery")){ renderRecovery(); }
+  const isRecovery = hash.includes("type=recovery") || (location.search||"").includes("type=recovery");
+  if(isRecovery){ recoveryMode=true; renderRecovery(); }
   sb.auth.onAuthStateChange((ev,sess)=>{
-    if(ev==="PASSWORD_RECOVERY"){ state.user=sess?sess.user:state.user; renderRecovery(); return; }
+    if(ev==="PASSWORD_RECOVERY"){ recoveryMode=true; state.user=sess?sess.user:state.user; renderRecovery(); return; }
+    if(recoveryMode) return;   // while resetting a password, never auto-enter the app
     if(sess && !state.user){ state.user=sess.user; loadAndShow(); }
     else if(!sess && state.user){ state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false; state.uploads=[]; state.albumView=null; _uploadRunning=0; renderAuth("login"); }
   });
-  if(hash.includes("type=recovery")) return;
+  if(isRecovery) return;
   try{
     const { data:{ session } } = await sb.auth.getSession();
     if(session){ state.user=session.user; await loadAndShow(); } else renderAuth("login");
@@ -535,10 +538,13 @@ function renderRecovery(){
     try{
       const { error }=await sb.auth.updateUser({ password:p1 });
       if(error){ $("#rGo").disabled=false; $("#rGo").textContent="Update password"; return msg(friendlyErr(error),"err"); }
-      try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
-      msg("Password updated. Loading your library…","ok");
-      const { data:{ session } }=await sb.auth.getSession();
-      if(session){ state.user=session.user; await loadAndShow(); } else renderAuth("login");
+      try{ history.replaceState(null,"",location.pathname); }catch(e){}
+      msg("Password updated.","ok");
+      recoveryMode=false;
+      try{ await sb.auth.signOut(); }catch(e){}
+      state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false; state.uploads=[]; state.albumView=null; _uploadRunning=0;
+      renderAuth("login");
+      setTimeout(()=>{ const m=$("#aMsg"); if(m){ m.textContent="Your password has been updated. Please sign in with your new password."; m.className="msg ok"; } },50);
     }catch(e){ $("#rGo").disabled=false; $("#rGo").textContent="Update password"; msg("Something went wrong. Try again.","err"); }
   }
   $("#rGo").onclick=go;
