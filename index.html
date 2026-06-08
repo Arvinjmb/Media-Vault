@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0c0e" />
 <title>Aurea</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Aurea" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap');
 
@@ -947,6 +954,24 @@ function renderUpload(c){
 }
 
 /* ============================================================ DETAIL (view / rename / album / download / delete) */
+function renameMediaFlow(m, onDone){
+  const { bg, close }=overlay({});
+  const sheet=el(`<div class="sheet"><h2>Rename</h2>
+    <p style="margin-bottom:12px">Give this ${esc(m.type)} a new name.</p>
+    <div class="field"><label>Name</label><input id="rnm" maxlength="200" value="${esc(m.name)}"></div>
+    <div class="sheet-actions"><button class="btn btn-metal" id="rnc">Cancel</button><button class="btn btn-blue" id="rng">Save</button></div></div>`);
+  bg.appendChild(sheet);
+  const inp=sheet.querySelector("#rnm"); setTimeout(()=>{ inp.focus(); inp.select(); },60);
+  sheet.querySelector("#rnc").onclick=close;
+  async function go(){
+    const name=inp.value.trim(); if(!name){ inp.focus(); return; }
+    const btn=sheet.querySelector("#rng"); btn.disabled=true; btn.textContent="Saving…";
+    try{ await sb.from("media").update({name}).eq("id",m.id); m.name=name; }catch(e){}
+    close(); if(onDone) onDone(name);
+  }
+  sheet.querySelector("#rng").onclick=go;
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+}
 function openDetail(m,canEdit){
   const isOwn = m.user_id===state.user.id;
   const { bg, close }=overlay({});
@@ -979,17 +1004,7 @@ function openDetail(m,canEdit){
   if(albSel) albSel.onchange=async()=>{ const v=albSel.value||null; try{ await sb.from("media").update({album_id:v}).eq("id",m.id); m.album_id=v; }catch(e){} };
 
   const pencil=modal.querySelector(".pencil");
-  if(pencil) pencil.onclick=()=>{
-    const mn=modal.querySelector(".mn"); if(mn.querySelector("input")) return;
-    const cur=m.name;
-    mn.innerHTML=`<input class="field" id="rnIn" value="${esc(cur)}" style="font-size:15px;padding:8px 10px;max-width:60vw"> <button class="btn-sm dl" id="rnSave">Save</button> <button class="btn-sm" id="rnX">Cancel</button>`;
-    const inp=mn.querySelector("#rnIn"); inp.focus(); inp.select();
-    const restore=(name)=>{ mn.innerHTML=`<span class="mtitle">${esc(name)}</span><button class="pencil" title="Rename">${IC.edit}</button>`; mn.querySelector(".pencil").onclick=pencil.onclick; };
-    mn.querySelector("#rnX").onclick=()=>restore(m.name);
-    async function save(){ const name=inp.value.trim(); if(!name){ inp.focus(); return; } try{ await sb.from("media").update({name}).eq("id",m.id); m.name=name; }catch(e){} restore(name); renderView(); }
-    mn.querySelector("#rnSave").onclick=save;
-    inp.addEventListener("keydown",e=>{ if(e.key==="Enter") save(); if(e.key==="Escape") restore(m.name); });
-  };
+  if(pencil) pencil.onclick=()=> renameMediaFlow(m, (newName)=>{ const t=modal.querySelector(".mtitle"); if(t) t.textContent=newName; modal.setAttribute("title",newName); renderView(); });
 
   if(delBtn) delBtn.onclick=()=>{
     if(modal.querySelector(".confirm")) return;
