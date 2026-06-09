@@ -307,7 +307,7 @@ const ADMIN_CAP_GB      = 5;     // owner account: a fixed 5 GB, separate from m
 const MEMBER_POOL_GB    = 5;     // all members SHARE this 5 GB, divided evenly between them (adaptive)
 const SAFETY_GB         = 0.2;   // small buffer so the site can never tip over 10 GB and get charged
 const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the Worker, under Cloudflare's 100 MB request size)
-const BUCKET            = "media";      // legacy/unused for media now (files live in R2)
+const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
 
@@ -410,14 +410,29 @@ const app=$("#app");
 const state={ user:null, isAdmin:false, items:[], albums:[], view:"dashboard", uploads:[], albumView:null, siteUsed:0 };
 const username=()=> (state.user&&state.user.user_metadata&&state.user.user_metadata.username) || (state.user&&state.user.email) || "";
 const GB=1024*1024*1024;
-/* storage stats: { member_count, member_used, admin_used } — filled on load */
-const memberCount=()=> Math.max(1, (state.stats&&state.stats.member_count)||1);
-const memberShareBytes=()=> (MEMBER_POOL_GB*GB)/memberCount();          // each member's adaptive share
-const myCapBytes=()=> state.isAdmin ? ADMIN_CAP_GB*GB : memberShareBytes();
-const myCapGB=()=> myCapBytes()/GB;
+/* storage stats: { member_count, member_used, admin_used, my_rank } — filled on load */
+const memberCount=()=> Math.max(0, (state.stats&&state.stats.member_count)||0);
 const memberUsed=()=> (state.stats&&state.stats.member_used)||0;
 const adminUsed=()=> (state.stats&&state.stats.admin_used)||0;
 const siteUsedBytes=()=> memberUsed()+adminUsed();
+const memberFree=()=> Math.max(0, (MEMBER_POOL_GB*GB) - memberUsed());
+const myUsedBytes=()=> state.items.reduce((s,m)=>s+(m.size||0),0);
+// how many members can be active at once while each still gets at least MIN_SHARE_MB
+const maxActiveMembers=()=> Math.max(1, Math.floor((MEMBER_POOL_GB*1024)/MIN_SHARE_MB));
+const activeMembers=()=> Math.max(1, Math.min(memberCount()||1, maxActiveMembers()));
+// each active member's share = the 5 GB pool split between the active members (always >= MIN_SHARE_MB)
+const memberShareBytes=()=> (MEMBER_POOL_GB*GB)/activeMembers();
+const myCapBytes=()=> state.isAdmin ? ADMIN_CAP_GB*GB : memberShareBytes();
+const myCapGB=()=> myCapBytes()/GB;
+// is THIS member allowed space yet? (a slot exists for them, and there's room to actually use)
+function amActive(){
+  if(state.isAdmin) return true;
+  const rank=state.stats&&state.stats.my_rank;
+  if(!rank) return true;                          // unknown rank: don't lock anyone out
+  if(rank>maxActiveMembers()) return false;       // too many members; newest wait for a slot
+  if(myUsedBytes()>0) return true;                // already has files: keep their access
+  return memberFree() >= MIN_SHARE_MB*1024*1024;  // brand-new: only active if there's real room
+}
 
 /* ---- Storage via the doorman Worker (everything proxied through Cloudflare) ---- */
 async function r2Token(){ try{ const { data:{ session } }=await sb.auth.getSession(); return session?session.access_token:null; }catch(e){ return null; } }
@@ -462,7 +477,7 @@ function xhrUpload(key, file, contentType, token, onprogress){
     x.send(file);
   });
 }
-async function refreshStats(){ try{ const r=await sb.rpc("aurea_stats"); if(r&&r.data){ const d=(typeof r.data==="string")?JSON.parse(r.data):r.data; state.stats={ member_count:Number(d.member_count)||0, member_used:Number(d.member_used)||0, admin_used:Number(d.admin_used)||0 }; } }catch(e){} }
+async function refreshStats(){ try{ const r=await sb.rpc("aurea_stats"); if(r&&r.data){ const d=(typeof r.data==="string")?JSON.parse(r.data):r.data; state.stats={ member_count:Number(d.member_count)||0, member_used:Number(d.member_used)||0, admin_used:Number(d.admin_used)||0, my_rank:(d.my_rank==null?null:Number(d.my_rank)) }; } }catch(e){} }
 let recoveryMode=false;
 
 /* ============================================================ BOOT */
@@ -783,19 +798,22 @@ function renderDashboard(c){
   const photos=items.filter(m=>m.type==="image").length, videos=items.filter(m=>m.type==="video").length;
   const audio=items.filter(m=>m.type==="audio").length, files=items.filter(m=>m.type==="file").length;
   const used=items.reduce((s,m)=>s+(m.size||0),0);
-  const myPct=Math.min(100,used/myCapBytes()*100);
+  const pending=!amActive();
+  const myPct=pending?0:Math.min(100,used/myCapBytes()*100);
   const shareTxt=(myCapGB()).toFixed(2).replace(/\.?0+$/,"");
-  const N=memberCount();
+  const active=activeMembers();
   const note=state.isAdmin
     ? `of your ${shareTxt} GB (owner space)`
-    : `of your ${shareTxt} GB share · 5 GB split between ${N} member${N===1?"":"s"}`;
+    : pending
+      ? `waiting for space — your share opens when room frees up`
+      : `of your ${shareTxt} GB share · 5 GB split between ${active} member${active===1?"":"s"}`;
   c.appendChild(el(`<h1 class="page-h">Dashboard</h1>`));
   c.appendChild(el(`<p class="page-sub">Welcome back, ${esc(username())}.</p>`));
   c.appendChild(el(`<div class="stats">
     <div class="stat"><div class="lab">Total files</div><div class="val">${items.length}</div><div class="meta">${photos} photos · ${videos} videos · ${audio} audio · ${files} files</div></div>
     <div class="stat"><div class="lab">Photos</div><div class="val">${photos}</div><div class="meta">image files</div></div>
     <div class="stat"><div class="lab">Audio &amp; Video</div><div class="val">${videos+audio}</div><div class="meta">${videos} video · ${audio} audio</div></div>
-    <div class="stat"><div class="lab">Storage used</div><div class="val">${fmtBytes(used)}</div><div class="bar"><i style="width:${myPct}%"></i></div><div class="meta">${note}</div></div>
+    <div class="stat"><div class="lab">Storage used</div><div class="val">${pending?"—":fmtBytes(used)}</div><div class="bar"><i style="width:${myPct}%"></i></div><div class="meta">${note}</div></div>
   </div>`));
   const head=el(`<div class="section-h"><h3>Recent uploads</h3></div>`);
   if(items.length){ const a=el(`<button class="link-btn">View library →</button>`); a.onclick=()=>{state.view="library";renderView();}; head.appendChild(a); }
@@ -1052,6 +1070,7 @@ async function processUpload(j){
   try{
     const myUsed=state.items.reduce((s,m)=>s+(m.size||0),0);
     const ceiling=(SITE_MAX_GB-SAFETY_GB)*GB;
+    if(!amActive()){ setJob(j,0,"waiting for storage","err"); return; }
     if(f.size > MAX_FILE_MB*1024*1024){ setJob(j,0,`too large (${MAX_FILE_MB} MB max)`,"err"); return; }
     if(myUsed + f.size > myCapBytes()){ setJob(j,0,"your share is full","err"); return; }
     if(!state.isAdmin && memberUsed() + f.size > MEMBER_POOL_GB*GB){ setJob(j,0,"members' shared space is full","err"); return; }
@@ -1085,6 +1104,12 @@ async function processUpload(j){
 
 function renderUpload(c){
   c.appendChild(el(`<h1 class="page-h">Upload</h1>`));
+  if(!amActive()){
+    c.appendChild(el(`<p class="page-sub">Your account is ready.</p>`));
+    c.appendChild(el(`<div class="empty"><div class="big">Storage is full right now</div>
+      <div>There isn't free space to give you your share yet. Your account is saved — you'll be able to upload automatically as soon as space frees up (when members remove files or the library has room). No action needed.</div></div>`));
+    return;
+  }
   c.appendChild(el(`<p class="page-sub">Drag in photos, videos, audio, or any file — full quality, several at once.</p>`));
   const drop=el(`<div class="drop"><div class="ic">${IC.up}</div><div class="t">Drop files here</div>
     <div class="s">Photos · Videos · Audio · Documents — anything, kept in your library at original quality</div>
