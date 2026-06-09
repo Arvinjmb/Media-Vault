@@ -112,6 +112,8 @@ img{display:block}
 .filters{display:inline-flex;background:#0d1015;border-radius:12px;padding:4px;gap:3px;border:1px solid var(--line);box-shadow:inset 0 1px 2px rgba(0,0,0,.5);flex-wrap:wrap}
 .chip{border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted)}
 .chip.active{background:linear-gradient(180deg,#23272f,#181b21);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.lib-search,.lib-sort{background:#0c0f14;border:1px solid var(--line-2);color:var(--text);border-radius:11px;padding:8px 12px;font-size:13.5px;font-family:inherit}
+.lib-search{min-width:150px} .lib-search:focus,.lib-sort:focus{outline:none;border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px}
 .tile{position:relative;aspect-ratio:1;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#0c0f14;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .18s,box-shadow .18s,border-color .18s}
 .tile:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--line-2)}
@@ -149,6 +151,10 @@ img{display:block}
 .drop .s{color:var(--muted);font-size:13.5px;max-width:420px;margin:0 auto}
 .drop .pill{display:inline-block;margin-top:18px;background:linear-gradient(180deg,var(--accent),var(--accent-2));border:1px solid var(--accent-d);color:#1c1606;font-weight:700;font-size:13.5px;padding:10px 22px;border-radius:12px;box-shadow:0 6px 18px var(--accent-glow)}
 .uplist{margin-top:22px;display:flex;flex-direction:column;gap:10px}
+.upsum{background:linear-gradient(180deg,var(--panel-1),var(--panel-2));border:1px solid var(--line-2);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow-sm)}
+.upsum-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);margin-bottom:9px}
+.upsum .pbar{height:7px;background:#0c0f14;border-radius:5px;overflow:hidden;box-shadow:inset 0 1px 1px rgba(0,0,0,.6)}
+.upsum .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .3s}
 .uprow{display:flex;align-items:center;gap:13px;background:linear-gradient(180deg,var(--panel-1),var(--panel-2));border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-sm)}
 .uprow .tn{width:44px;height:44px;border-radius:10px;object-fit:cover;background:#0c0f14;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#8a93a0;border:1px solid var(--line)}
 .uprow .info{flex:1;min-width:0}
@@ -207,6 +213,16 @@ img{display:block}
 .btn-sm:hover{background:linear-gradient(180deg,#2e343d,#20252c)} .btn-sm.dl{background:linear-gradient(180deg,var(--accent),var(--accent-2));border-color:var(--accent-d);color:#1c1606} .btn-sm.del{color:var(--danger)} .btn-sm:disabled{opacity:.5;cursor:default}
 .modal-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;z-index:2;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .modal-x:hover{background:rgba(255,255,255,.22)}
+.modal-nav{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;z-index:2;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.modal-nav:hover{background:rgba(0,0,0,.62)} .modal-nav.prev{left:12px} .modal-nav.next{right:12px}
+.modal-stage img.zoomable{cursor:zoom-in} .modal-stage img.zoomed{max-width:none;max-height:none;width:auto;height:auto;cursor:zoom-out;object-fit:none}
+.modal-stage.zoomwrap{overflow:auto}
+.fav-btn{position:absolute;top:10px;left:10px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;color:#fff;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.fav-btn:hover{background:rgba(0,0,0,.62)}
+.toast{position:fixed;left:50%;bottom:calc(86px + var(--safe-b));transform:translateX(-50%) translateY(16px);background:#1b2027;border:1px solid var(--line-2);color:var(--text);padding:11px 18px;border-radius:13px;font-size:14px;font-weight:600;box-shadow:0 18px 50px rgba(0,0,0,.55);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@keyframes tileIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.tile{animation:tileIn .26s ease both}
 .confirm{margin:0 18px 18px;background:#0c0f14;border:1px solid var(--danger);border-radius:14px;padding:14px 15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .confirm span{font-size:13.5px;flex:1}
 .sheet{width:100%;max-width:460px;background:linear-gradient(180deg,var(--panel-1),var(--panel-2));border:1px solid var(--line-2);border-radius:22px;padding:28px 26px calc(26px + var(--safe-b));box-shadow:0 50px 110px rgba(0,0,0,.7);animation:rise .22s cubic-bezier(.2,.7,.2,1) both}
@@ -310,6 +326,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
+const APP_VERSION       = "1.0";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -327,8 +344,23 @@ const $ = (s,r=document)=>r.querySelector(s);
 const el = (h)=>{ const t=document.createElement("template"); t.innerHTML=h.trim(); return t.content.firstElementChild; };
 const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmtBytes=(n)=>{ if(!n) return "0 B"; const u=["B","KB","MB","GB","TB"],i=Math.floor(Math.log(n)/Math.log(1024)); return (n/Math.pow(1024,i)).toFixed(i?1:0)+" "+u[i]; };
-const fmtTime=(ts)=>new Date(ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+const fmtTime=(ts)=>{ const d=new Date(ts), now=new Date();
+  const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+  const y=new Date(now); y.setDate(now.getDate()-1);
+  const t=d.toLocaleString(undefined,{hour:"numeric",minute:"2-digit"});
+  if(sameDay(d,now)) return "Today, "+t;
+  if(sameDay(d,y)) return "Yesterday, "+t;
+  const sameYear=d.getFullYear()===now.getFullYear();
+  return d.toLocaleString(undefined, sameYear?{month:"short",day:"numeric"}:{month:"short",day:"numeric",year:"numeric"});
+};
 const fmtDur=(s)=>{ if(!s||!isFinite(s)) return ""; const m=Math.floor(s/60),x=Math.floor(s%60); return m+":"+String(x).padStart(2,"0"); };
+let _toastT=null;
+function toast(msg){
+  let t=document.getElementById("toast");
+  if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add("on");
+  clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove("on"), 2200);
+}
 const uuid=()=> (crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 const extOf=(name)=>{ const m=/\.([a-z0-9]+)$/i.exec(name||""); return m?m[1]:"file"; };
 function categorize(mime){
@@ -386,6 +418,11 @@ function splashHTML(){
 }
 
 const IC={
+  star:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  starOn:'<svg width="18" height="18" viewBox="0 0 24 24" fill="#e7c66b" stroke="#e7c66b" stroke-width="1.2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  prev:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  next:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+  copy:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   up:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>',
   play:'<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>',
   vid:'<svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>',
@@ -787,9 +824,17 @@ function tileNode(m,opts){
     t.insertAdjacentHTML("beforeend", `<div class="selmark">${IC.check}</div>`);
     t.onclick=()=> opts.onToggle && opts.onToggle(m,t);
   }else{
-    t.onclick=()=>openDetail(m,opts.canEdit);
+    const fav=el(`<div class="fav-btn" title="${m.favorite?"Remove favorite":"Add favorite"}">${m.favorite?IC.starOn:IC.star}</div>`);
+    fav.onclick=async(e)=>{ e.stopPropagation(); await toggleFavorite(m); fav.innerHTML=m.favorite?IC.starOn:IC.star; fav.title=m.favorite?"Remove favorite":"Add favorite"; if(opts.onFav) opts.onFav(m); };
+    t.appendChild(fav);
+    t.onclick=()=>openDetail(m,opts.canEdit,opts.list);
   }
   return t;
+}
+async function toggleFavorite(m){
+  const nv=!m.favorite;
+  try{ await sb.from("media").update({favorite:nv}).eq("id",m.id); m.favorite=nv; toast(nv?"Added to favorites":"Removed from favorites"); }
+  catch(e){ toast("Couldn't update favorite"); }
 }
 
 /* ============================================================ DASHBOARD */
@@ -821,7 +866,7 @@ function renderDashboard(c){
   if(!items.length){
     const e=el(`<div class="empty"><div class="big">Your vault is empty</div><div style="margin-bottom:18px">Upload your first files to get started.</div><button class="btn btn-blue" style="width:auto;padding:11px 22px">Upload media</button></div>`);
     e.querySelector("button").onclick=()=>{state.view="upload";renderView();}; c.appendChild(e);
-  }else{ const g=el(`<div class="grid"></div>`); items.slice(0,8).forEach(m=>g.appendChild(tileNode(m,{canEdit:true}))); c.appendChild(g); }
+  }else{ const recent=items.slice(0,8); const g=el(`<div class="grid"></div>`); recent.forEach(m=>g.appendChild(tileNode(m,{canEdit:true, list:recent}))); c.appendChild(g); }
 }
 
 /* ============================================================ LIBRARY */
@@ -833,8 +878,11 @@ function renderLibrary(c){
   const bar=el(`<div class="toolbar"><div class="filters">
     <button class="chip active" data-f="all">All</button><button class="chip" data-f="image">Photos</button>
     <button class="chip" data-f="video">Videos</button><button class="chip" data-f="audio">Audio</button>
-    <button class="chip" data-f="file">Files</button></div>
-    <div style="display:flex;align-items:center;gap:10px"><span id="count" style="color:var(--muted);font-size:13px"></span><button class="btn-sm" id="selBtn">Select</button></div></div>`);
+    <button class="chip" data-f="file">Files</button><button class="chip" data-f="fav">Favorites</button></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <input id="libSearch" class="lib-search" type="search" placeholder="Search by name…" autocomplete="off">
+    <select id="libSort" class="lib-sort"><option value="new">Newest</option><option value="old">Oldest</option><option value="name">Name A–Z</option><option value="size">Largest</option></select>
+    <span id="count" style="color:var(--muted);font-size:13px"></span><button class="btn-sm" id="selBtn">Select</button></div></div>`);
   c.appendChild(bar); const wrap=el(`<div></div>`); c.appendChild(wrap);
   const selBtn=bar.querySelector("#selBtn");
   let selbar=null;
@@ -860,14 +908,29 @@ function renderLibrary(c){
     updateBar();
   }
   function draw(){
-    const list=state.items.filter(m=>filter==="all"||m.type===filter);
+    const term=((bar.querySelector("#libSearch")||{}).value||"").trim().toLowerCase();
+    const sort=((bar.querySelector("#libSort")||{}).value)||"new";
+    let list=state.items.filter(m=> filter==="fav" ? m.favorite : (filter==="all"||m.type===filter));
+    if(term) list=list.filter(m=>(m.name||"").toLowerCase().includes(term));
+    list=list.slice();
+    if(sort==="new") list.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    else if(sort==="old") list.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    else if(sort==="name") list.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    else if(sort==="size") list.sort((a,b)=>(b.size||0)-(a.size||0));
     $("#count").textContent=list.length+" item"+(list.length!==1?"s":"");
     wrap.innerHTML="";
-    if(!list.length){ wrap.appendChild(el(`<div class="empty"><div class="big">Nothing here yet</div><div>${state.items.length===0?"Upload some files to fill your library.":"No items match this filter."}</div></div>`)); }
-    else{ const g=el(`<div class="grid"></div>`); list.forEach(m=>g.appendChild(tileNode(m,{canEdit:true, selectable:selMode, selected:sel.has(m.id), onToggle:toggle}))); wrap.appendChild(g); }
+    if(!list.length){
+      const msg = state.items.length===0 ? "Upload some files to fill your library."
+        : filter==="fav" ? "No favorites yet — tap the star on any file to add it here."
+        : term ? "No items match your search." : "No items match this filter.";
+      wrap.appendChild(el(`<div class="empty"><div class="big">${filter==="fav"&&state.items.length?"No favorites yet":"Nothing here"}</div><div>${msg}</div></div>`));
+    }
+    else{ const g=el(`<div class="grid"></div>`); list.forEach(m=>g.appendChild(tileNode(m,{canEdit:true, selectable:selMode, selected:sel.has(m.id), onToggle:toggle, list, onFav:()=>{ if(filter==="fav") draw(); }}))); wrap.appendChild(g); }
   }
   selBtn.onclick=()=>{ selMode=!selMode; if(!selMode) sel.clear(); selBtn.textContent=selMode?"Done":"Select"; updateBar(); draw(); };
   bar.querySelectorAll(".chip").forEach(ch=>ch.onclick=()=>{ filter=ch.dataset.f; bar.querySelectorAll(".chip").forEach(x=>x.classList.toggle("active",x===ch)); draw(); });
+  bar.querySelector("#libSearch").oninput=()=>draw();
+  bar.querySelector("#libSort").onchange=()=>draw();
   draw();
 }
 
@@ -907,7 +970,7 @@ function renderAlbumDetail(c,a){
   const mine=state.items.filter(m=>m.album_id===a.id);
   c.appendChild(el(`<p class="page-sub">${mine.length} item${mine.length!==1?"s":""} · tap “Add media” to add several at once. Open any item to remove it.</p>`));
   if(!mine.length){ const e=el(`<div class="empty"><div class="big">This album is empty</div><div style="margin-bottom:18px">Add photos, videos or files to this album.</div><button class="btn btn-blue" style="width:auto;padding:11px 22px">Add media</button></div>`); e.querySelector("button").onclick=()=>openAlbumPicker(a); c.appendChild(e); return; }
-  const g=el(`<div class="grid"></div>`); mine.forEach(m=>g.appendChild(tileNode(m,{canEdit:true}))); c.appendChild(g);
+  const g=el(`<div class="grid"></div>`); mine.forEach(m=>g.appendChild(tileNode(m,{canEdit:true, list:mine}))); c.appendChild(g);
 }
 function openAlbumPicker(a){
   const { bg, close }=overlay({});
@@ -983,6 +1046,7 @@ async function bulkAddToAlbum(ids, albumId){
   if(!ids.length || !albumId) return;
   try{ await sb.from("media").update({album_id:albumId}).in("id",ids); }catch(e){}
   state.items.forEach(m=>{ if(ids.includes(m.id)) m.album_id=albumId; });
+  toast(ids.length===1?"Added to album":`Added ${ids.length} to album`);
 }
 function bulkDeleteFlow(ids, after){
   const { bg, close }=overlay({});
@@ -999,6 +1063,7 @@ function bulkDeleteFlow(ids, after){
     try{ await sb.from("media").delete().in("id",ids); }catch(e){}
     state.items=state.items.filter(m=>!ids.includes(m.id));
     if(state.stats){ if(state.isAdmin) state.stats.admin_used=Math.max(0,(state.stats.admin_used||0)-freed); else state.stats.member_used=Math.max(0,(state.stats.member_used||0)-freed); }
+    toast(ids.length===1?"Deleted":`Deleted ${ids.length} items`);
     close(); if(after) after();
   };
 }
@@ -1037,15 +1102,28 @@ function deleteAlbumFlow(a){
 
 /* ============================================================ UPLOAD (persistent across tabs) */
 let _uploadRunning=0;
+let _notifyDone=false;
 function uploadsActive(){ return state.uploads.some(j=>j.cls!=="ok"&&j.cls!=="err"); }
 function uploadRow(j){
   const tn = j.thumb ? `<img class="tn" src="${j.thumb}" alt="">` : `<div class="tn">${IC.file}</div>`;
   return el(`<div class="uprow" data-job="${j.id}">${tn}<div class="info"><div class="fn">${esc(j.name)}</div>
     <div class="pbar"><i style="width:${j.pct}%"></i></div></div><div class="st${j.cls?" "+j.cls:""}">${esc(j.status)}</div></div>`);
 }
+function clearFinishedUploads(){ state.uploads=state.uploads.filter(j=>j.cls!=="ok"&&j.cls!=="err"); paintUploads(); updateNavDots(); }
 function paintUploads(){
   const list=$("#uplist"); if(!list) return;
-  list.innerHTML=""; state.uploads.forEach(j=>list.appendChild(uploadRow(j)));
+  list.innerHTML="";
+  const jobs=state.uploads;
+  if(jobs.length){
+    const done=jobs.filter(j=>j.cls==="ok").length, failed=jobs.filter(j=>j.cls==="err").length, active=jobs.length-done-failed;
+    const totalBytes=jobs.reduce((s,j)=>s+(((j._file&&j._file.size)||0)),0);
+    const avgPct=Math.round(jobs.reduce((s,j)=>s+(j.cls==="ok"?100:(j.pct||0)),0)/jobs.length);
+    const label=`${active?`Uploading ${active}`:"All done"}${done?` · ${done} done`:""}${failed?` · ${failed} failed`:""} · ${fmtBytes(totalBytes)} total`;
+    const sum=el(`<div class="upsum"><div class="upsum-row"><span>${label}</span>${(done||failed)?`<button class="link-btn" id="upclear">Clear finished</button>`:""}</div><div class="pbar"><i style="width:${avgPct}%"></i></div></div>`);
+    list.appendChild(sum);
+    const cb=sum.querySelector("#upclear"); if(cb) cb.onclick=clearFinishedUploads;
+  }
+  jobs.forEach(j=>list.appendChild(uploadRow(j)));
 }
 function setJob(j,pct,status,cls){ j.pct=pct; j.status=status; j.cls=cls||""; paintUploads(); updateNavDots(); }
 
@@ -1055,6 +1133,7 @@ function enqueueUploads(fileList){
     const j={ id:uuid(), name:f.name, pct:0, status:"queued", cls:"", thumb:null, type:categorize(f.type), _file:f, _started:false };
     state.uploads.unshift(j);
   });
+  _notifyDone=true;
   paintUploads(); updateNavDots(); pumpUploads();
 }
 function pumpUploads(){
@@ -1063,6 +1142,12 @@ function pumpUploads(){
     if(!j) break;
     j._started=true; _uploadRunning++;
     processUpload(j).then(()=>{ _uploadRunning--; pumpUploads(); }).catch(()=>{ _uploadRunning--; pumpUploads(); });
+  }
+  if(_uploadRunning===0 && _notifyDone && !uploadsActive()){
+    _notifyDone=false;
+    const ok=state.uploads.filter(j=>j.cls==="ok").length, bad=state.uploads.filter(j=>j.cls==="err").length;
+    if(ok) toast(bad?`Uploaded ${ok}, ${bad} failed`:(ok===1?"Uploaded":`Uploaded ${ok} files`));
+    else if(bad) toast("Upload failed");
   }
 }
 async function processUpload(j){
@@ -1146,9 +1231,12 @@ function renameMediaFlow(m, onDone){
   sheet.querySelector("#rng").onclick=go;
   inp.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
 }
-function openDetail(m,canEdit){
+function openDetail(m,canEdit,list){
   const isOwn = m.user_id===state.user.id;
   const { bg, close }=overlay({});
+  list = Array.isArray(list)&&list.length ? list : [m];
+  const idx = Math.max(0, list.findIndex(x=>x.id===m.id));
+  const goTo=(j)=>{ if(j<0||j>=list.length||j===idx) return; close(); openDetail(list[j],canEdit,list); };
   const albumSel = (canEdit && isOwn)
     ? `<select class="btn-sm" id="albSel" style="-webkit-appearance:none;appearance:none;padding-right:14px"><option value="">No album</option>${state.albums.map(a=>`<option value="${a.id}" ${m.album_id===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select>`
     : "";
@@ -1161,6 +1249,28 @@ function openDetail(m,canEdit){
   const stage=modal.querySelector(".modal-stage"), dlBtn=modal.querySelector(".dl"), delBtn=modal.querySelector(".del");
   modal.querySelector(".modal-x").onclick=close;
 
+  // favorite star (own files only)
+  if(isOwn){
+    const fav=el(`<div class="fav-btn" title="${m.favorite?"Remove favorite":"Add favorite"}">${m.favorite?IC.starOn:IC.star}</div>`);
+    fav.onclick=async()=>{ await toggleFavorite(m); fav.innerHTML=m.favorite?IC.starOn:IC.star; };
+    stage.appendChild(fav);
+  }
+  // prev / next navigation
+  if(list.length>1){
+    const prev=el(`<div class="modal-nav prev" title="Previous">${IC.prev}</div>`);
+    const next=el(`<div class="modal-nav next" title="Next">${IC.next}</div>`);
+    prev.onclick=()=>goTo(idx-1); next.onclick=()=>goTo(idx+1);
+    if(idx<=0) prev.style.display="none";
+    if(idx>=list.length-1) next.style.display="none";
+    stage.appendChild(prev); stage.appendChild(next);
+    const onKey=(e)=>{ if(!document.body.contains(modal)){ document.removeEventListener("keydown",onKey); return; } if(e.key==="ArrowLeft") goTo(idx-1); else if(e.key==="ArrowRight") goTo(idx+1); };
+    document.addEventListener("keydown",onKey);
+    // swipe (ignore when an image is zoomed)
+    let sx=0, sy=0;
+    stage.addEventListener("touchstart",(e)=>{ const t=e.changedTouches[0]; sx=t.clientX; sy=t.clientY; },{passive:true});
+    stage.addEventListener("touchend",(e)=>{ if(stage.querySelector("img.zoomed")) return; const t=e.changedTouches[0]; const dx=t.clientX-sx, dy=t.clientY-sy; if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.4){ if(dx>0) goTo(idx-1); else goTo(idx+1); } },{passive:true});
+  }
+
   // show the thumbnail instantly while the full file streams in
   if(m.thumb && (m.type==="image"||m.type==="video")){
     const ph=el(`<img class="modal-ph" src="${m.thumb}" alt="" style="filter:blur(1px);opacity:.85">`);
@@ -1171,7 +1281,7 @@ function openDetail(m,canEdit){
     const ph=stage.querySelector(".modal-ph"); if(ph) ph.remove();
     let node;
     if(m.type==="video") node=el(`<video src="${url}" controls autoplay playsinline ${m.thumb?`poster="${m.thumb}"`:""}></video>`);
-    else if(m.type==="image") node=el(`<img src="${url}" alt="${esc(m.name)}">`);
+    else if(m.type==="image"){ node=el(`<img class="zoomable" src="${url}" alt="${esc(m.name)}">`); node.onclick=()=>{ const z=node.classList.toggle("zoomed"); stage.classList.toggle("zoomwrap",z); }; }
     else if(m.type==="audio") node=el(`<div class="audio-art">${IC.audio}<audio src="${url}" controls autoplay style="width:min(520px,80vw)"></audio></div>`);
     else node=el(`<div class="file-art">${IC.file}<div>${esc(m.name)}</div><div style="font-size:12.5px;opacity:.7">Preview not available — use Download to open.</div></div>`);
     stage.appendChild(node);
@@ -1183,7 +1293,7 @@ function openDetail(m,canEdit){
   if(albSel) albSel.onchange=async()=>{ const v=albSel.value||null; try{ await sb.from("media").update({album_id:v}).eq("id",m.id); m.album_id=v; }catch(e){} };
 
   const pencil=modal.querySelector(".pencil");
-  if(pencil) pencil.onclick=()=> renameMediaFlow(m, (newName)=>{ const t=modal.querySelector(".mtitle"); if(t) t.textContent=newName; modal.setAttribute("title",newName); renderView(); });
+  if(pencil) pencil.onclick=()=> renameMediaFlow(m, (newName)=>{ const t=modal.querySelector(".mtitle"); if(t) t.textContent=newName; modal.setAttribute("title",newName); toast("Renamed"); renderView(); });
 
   if(delBtn) delBtn.onclick=()=>{
     if(modal.querySelector(".confirm")) return;
@@ -1200,6 +1310,7 @@ function openDetail(m,canEdit){
         else state.stats.member_used=Math.max(0,(state.stats.member_used||0)-(m.size||0));
       }
       if(isOwn) state.items=state.items.filter(x=>x.id!==m.id);
+      toast("Deleted");
       close(); renderView();
     };
   };
@@ -1212,16 +1323,35 @@ function renderSettings(c){
   c.appendChild(el(`<h1 class="page-h">Settings</h1>`));
   c.appendChild(el(`<p class="page-sub">Update your name or password. Your email stays the same.</p>`));
 
+  /* ---- storage ---- */
+  {
+    const used=myUsedBytes(), pending=!amActive();
+    const shareTxt=(myCapGB()).toFixed(2).replace(/\.?0+$/,"");
+    const pct=pending?0:Math.min(100,used/myCapBytes()*100);
+    const note=state.isAdmin ? `${fmtBytes(used)} of your ${shareTxt} GB owner space`
+      : pending ? `Waiting for space — your share opens automatically when room frees up.`
+      : `${fmtBytes(used)} of your ${shareTxt} GB share · 5 GB split between ${activeMembers()} member${activeMembers()===1?"":"s"}`;
+    const scard=el(`<div class="admin-card" style="max-width:520px">
+      <div class="section-h"><h3>Storage</h3></div>
+      <div class="bar" style="margin:2px 0 10px"><i style="width:${pct}%"></i></div>
+      <div style="font-size:13px;color:var(--muted)">${note}</div></div>`);
+    c.appendChild(scard);
+  }
+
   /* ---- name ---- */
   const card=el(`<div class="admin-card" style="max-width:520px">
     <div class="section-h"><h3>Your name</h3></div>
     <div class="field"><label>First name</label><input id="stFirst" autocomplete="given-name" value="${esc(first)}" placeholder="First name"></div>
     <div class="field"><label>Last name</label><input id="stLast" autocomplete="family-name" value="${esc(last)}" placeholder="Last name"></div>
-    <div class="field"><label>Email (can't be changed)</label><input id="stEmail" value="${esc(state.user.email||"")}" disabled style="opacity:.6"></div>
+    <div class="field"><label>Email (can't be changed)</label>
+      <div style="display:flex;gap:8px"><input id="stEmail" value="${esc(state.user.email||"")}" disabled style="opacity:.6;flex:1">
+      <button class="btn-sm" id="stCopy" type="button">${IC.copy} Copy</button></div></div>
     <div class="msg" id="stMsg"></div>
     <button class="btn btn-blue" id="stSave" style="width:auto;padding:11px 24px">Save name</button>
   </div>`);
   c.appendChild(card);
+  const cpy=card.querySelector("#stCopy");
+  if(cpy) cpy.onclick=async()=>{ try{ await navigator.clipboard.writeText(state.user.email||""); toast("Email copied"); }catch(e){ toast("Couldn't copy"); } };
   const msg=(t,cls)=>{ const m=card.querySelector("#stMsg"); m.textContent=t; m.className="msg"+(cls?" "+cls:""); };
   card.querySelector("#stSave").onclick=async()=>{
     const f=card.querySelector("#stFirst").value.trim(), l=card.querySelector("#stLast").value.trim();
@@ -1238,6 +1368,7 @@ function renderSettings(c){
       btn.disabled=false; btn.textContent="Save name";
       if(pr&&pr.error) msg("Name saved for sign-in, but syncing failed: "+(pr.error.message||"")+". Try again.","err");
       else msg("Saved. Your name has been updated.","ok");
+      if(!(pr&&pr.error)) toast("Saved");
     }catch(e){ btn.disabled=false; btn.textContent="Save name"; msg("Something went wrong. Try again.","err"); }
   };
 
@@ -1261,7 +1392,7 @@ function renderSettings(c){
       if(up.error){ btn.disabled=false; btn.textContent="Change password"; return pmsg(friendlyErr(up.error),"err"); }
       pcard.querySelector("#pwNew").value=""; pcard.querySelector("#pwNew2").value="";
       btn.disabled=false; btn.textContent="Change password";
-      pmsg("Your password has been changed.","ok");
+      pmsg("Your password has been changed.","ok"); toast("Password changed");
     }catch(e){ btn.disabled=false; btn.textContent="Change password"; pmsg("Something went wrong. Try again.","err"); }
   };
 
@@ -1274,6 +1405,7 @@ function renderSettings(c){
     c.appendChild(dcard);
     dcard.querySelector("#stDel").onclick=selfDeleteFlow;
   }
+  c.appendChild(el(`<div style="max-width:520px;text-align:center;color:var(--muted);font-size:12px;margin-top:8px">Aurea v${APP_VERSION}</div>`));
 }
 
 /* ============================================================ ACCOUNT DELETION (user: 3 steps, password at step 2) */
@@ -1373,7 +1505,7 @@ async function renderAdmin(c){
       card.appendChild(act);
     }
     const grid=el(`<div class="grid" style="display:none;margin-top:14px"></div>`);
-    mine.forEach(m=>grid.appendChild(tileNode(m,{canEdit:true})));
+    mine.forEach(m=>grid.appendChild(tileNode(m,{canEdit:true, list:mine})));
     card.appendChild(grid);
     card.querySelector(".ahead").onclick=()=>{ grid.style.display=grid.style.display==="none"?"grid":"none"; };
     wrap.appendChild(card);
