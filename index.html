@@ -185,6 +185,18 @@ img{display:block}
 .admin-user .tag{font-size:11px;font-weight:700;color:var(--accent)} .admin-user .tag.ban{color:var(--danger)}
 .admin-user .acount{font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap}
 .admin-card{background:linear-gradient(180deg,var(--panel-1),var(--panel-2));border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:22px;box-shadow:inset 0 1px 0 var(--panel-hi),var(--shadow-sm)}
+.req{padding:16px 18px}
+.req-new{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow-sm)}
+.req-head .an{font-weight:800;font-size:15.5px;display:flex;align-items:center;gap:8px}
+.req-head .ae{font-size:13px;color:var(--muted);margin-top:2px}
+.req-badge{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:var(--accent);color:#06121f;padding:2px 7px;border-radius:999px}
+.req-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.req-actions .req-ok{background:linear-gradient(180deg,#1f7a44,#155e33);border-color:#155e33;color:#fff}
+.req-actions .req-ok svg{vertical-align:-3px}
+.gate-wrap{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-card{max-width:430px;width:100%;text-align:center;background:linear-gradient(180deg,var(--panel-1),var(--panel-2));border:1px solid var(--line);border-radius:22px;padding:34px 26px;box-shadow:inset 0 1px 0 var(--panel-hi),0 24px 70px rgba(0,0,0,.5)}
+.gate-card h1{font-size:23px;margin:14px 0 10px} .gate-card p{color:var(--muted);font-size:14.5px;line-height:1.55}
+.gate-badge{display:flex;justify-content:center} .gate-actions{display:flex;flex-direction:column;gap:10px;margin-top:22px}
 .banner-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair)}
 .banner-row:first-of-type{border-top:none}
 .banner-row .bt{flex:1;min-width:0}
@@ -326,7 +338,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "1.2";
+const APP_VERSION       = "3.4";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -681,7 +693,7 @@ async function loadAndShow(){
   app.innerHTML=splashHTML();
   state.uploads=[]; state.albumView=null; _uploadRunning=0;   // start clean for this account
   let prof=null;
-  try{ const r=await sb.from("profiles").select("is_admin,banned").eq("id",state.user.id).single(); prof=r.data; }catch(e){ prof=null; }
+  try{ const r=await sb.from("profiles").select("is_admin,banned,status,request_seen").eq("id",state.user.id).single(); prof=r.data; }catch(e){ prof=null; }
   if(!prof || prof.banned){
     await sb.auth.signOut();
     state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false;
@@ -690,6 +702,8 @@ async function loadAndShow(){
     return;
   }
   state.isAdmin=!!prof.is_admin;
+  state.myStatus=prof.status||"approved";
+  if(!state.isAdmin && state.myStatus!=="approved"){ renderGate(state.myStatus); return; }
   try{
     const { data,error }=await sb.from("media").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false});
     state.items=error?[]:(data||[]);
@@ -699,8 +713,40 @@ async function loadAndShow(){
     state.albums=data||[];
   }catch(e){ state.albums=[]; }
   await refreshStats();
+  await refreshRequests();
   state.view="dashboard"; renderShell();
   maybeShowBanner();
+}
+/* approval gate shown to members who aren't approved yet */
+function renderGate(kind){
+  app.innerHTML="";
+  const denied = kind==="denied";
+  const card=el(`<div class="gate-wrap"><div class="gate-card">
+    <div class="gate-badge">${vaultLogo(46,"top")}</div>
+    <h1>${denied?"Request not approved":"Waiting for approval"}</h1>
+    <p>${denied
+      ? "The owner didn't approve this request. You can ask again whenever you like — your email stays the same."
+      : "Your account is created and is waiting for the owner to approve it. You'll get in as soon as it's approved — you can check back anytime."}</p>
+    <div class="gate-actions">
+      ${denied?`<button class="btn btn-blue" id="gAgain">Request again</button>`:`<button class="btn btn-blue" id="gCheck">Check again</button>`}
+      <button class="btn btn-metal" id="gOut">${IC.out} Sign out</button>
+    </div>
+    <div class="msg" id="gMsg"></div>
+  </div></div>`);
+  app.appendChild(card);
+  card.querySelector("#gOut").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
+  const check=card.querySelector("#gCheck"); if(check) check.onclick=()=>loadAndShow();
+  const again=card.querySelector("#gAgain"); if(again) again.onclick=async()=>{
+    again.disabled=true;
+    try{ await sb.from("profiles").update({status:"pending",request_seen:false}).eq("id",state.user.id); }catch(e){}
+    state.myStatus="pending"; renderGate("pending");
+  };
+}
+async function refreshRequests(){
+  if(!state.isAdmin){ state.requests=[]; state.pendingUnseen=0; return; }
+  try{ const r=await sb.from("profiles").select("id,username,email,created_at,status,request_seen").eq("status","pending").order("created_at",{ascending:true}); state.requests=r.data||[]; }
+  catch(e){ state.requests=[]; }
+  state.pendingUnseen=(state.requests||[]).filter(x=>!x.request_seen).length;
 }
 
 /* ============================================================ ENTRY BANNER */
@@ -773,7 +819,7 @@ function footerNode(){
   </footer>`);
 }
 
-function navTabs(){ const t=["dashboard","upload","library","albums","settings"]; if(state.isAdmin) t.push("admin"); return t; }
+function navTabs(){ const t=["dashboard","upload","library","albums","settings"]; if(state.isAdmin){ t.push("admin"); t.push("approvals"); } return t; }
 function renderShell(){
   app.innerHTML="";
   app.appendChild(el(`<div class="topbar"><div class="topbar-in">
@@ -782,7 +828,7 @@ function renderShell(){
   </div></div>`));
   app.appendChild(el(`<div class="shell"><div class="nav" id="nav"></div><div id="content"></div></div>`));
   const nav=$("#nav");
-  const LBL={dashboard:"Dashboard",upload:"Upload",library:"Library",albums:"Albums",settings:"Settings",admin:"Control"};
+  const LBL={dashboard:"Dashboard",upload:"Upload",library:"Library",albums:"Albums",settings:"Settings",admin:"Control",approvals:"Approvals"};
   navTabs().forEach(v=>{ const b=el(`<button data-tab="${v}" class="${v===state.view?"active":""}">${LBL[v]||v}</button>`); b.onclick=()=>{ if(v!=="albums") state.albumView=null; state.view=v; renderView(); }; nav.appendChild(b); });
   $("#logout").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
   $(".shell").appendChild(footerNode());
@@ -791,10 +837,10 @@ function renderShell(){
 function setActiveNav(){ const tabs=navTabs(); [...$("#nav").children].forEach((b,i)=>b.classList.toggle("active",tabs[i]===state.view)); }
 function updateNavDots(){
   const nav=$("#nav"); if(!nav) return;
-  const up=nav.querySelector('button[data-tab="upload"]'); if(!up) return;
-  let dot=up.querySelector(".dot");
-  if(uploadsActive()){ if(!dot){ up.appendChild(el(`<span class="dot"></span>`)); } }
-  else if(dot){ dot.remove(); }
+  const up=nav.querySelector('button[data-tab="upload"]');
+  if(up){ let dot=up.querySelector(".dot"); if(uploadsActive()){ if(!dot) up.appendChild(el(`<span class="dot"></span>`)); } else if(dot){ dot.remove(); } }
+  const ap=nav.querySelector('button[data-tab="approvals"]');
+  if(ap){ let dot=ap.querySelector(".dot"); if((state.pendingUnseen||0)>0){ if(!dot) ap.appendChild(el(`<span class="dot"></span>`)); } else if(dot){ dot.remove(); } }
 }
 function renderView(){
   setActiveNav(); const c=$("#content"); c.innerHTML="";
@@ -804,6 +850,7 @@ function renderView(){
   else if(state.view==="albums") renderAlbums(c);
   else if(state.view==="settings") renderSettings(c);
   else if(state.view==="admin") renderAdmin(c);
+  else if(state.view==="approvals") renderApprovals(c);
   else renderLibrary(c);
   updateNavDots();
 }
@@ -1478,6 +1525,43 @@ function selfDeleteFlow(){
 }
 
 /* ============================================================ ADMIN */
+async function renderApprovals(c){
+  if(!state.isAdmin){ c.appendChild(el(`<div class="empty"><div class="big">Not available</div></div>`)); return; }
+  c.appendChild(el(`<h1 class="page-h">Approvals</h1>`));
+  c.appendChild(el(`<p class="page-sub">New accounts waiting to join. <b>Approve</b> lets them in, <b>Deny</b> refuses them (they can ask again), <b>Wait</b> keeps it pending and just clears the notification.</p>`));
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); c.appendChild(wrap);
+  await refreshRequests();
+  wrap.innerHTML="";
+  const reqs=state.requests||[];
+  if(!reqs.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No pending requests</div><div>When someone signs up, they'll appear here for you to approve.</div></div>`)); updateNavDots(); return; }
+  reqs.forEach(p=>{
+    const isNew=!p.request_seen;
+    const card=el(`<div class="admin-card req${isNew?" req-new":""}">
+      <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}${isNew?`<span class="req-badge">new</span>`:""}</div>
+        <div class="ae">${esc(p.email||"")}</div>
+        <div class="ae" style="opacity:.65">Requested ${fmtTime(p.created_at)}</div></div></div>
+      <div class="req-actions">
+        <button class="btn-sm req-ok">${IC.check} Approve</button>
+        <button class="btn-sm del req-no">${IC.x} Deny</button>
+        <button class="btn-sm req-wait">Wait</button>
+      </div></div>`);
+    card.querySelector(".req-ok").onclick=()=>reqAct(p,"approved");
+    card.querySelector(".req-no").onclick=()=>reqAct(p,"denied");
+    card.querySelector(".req-wait").onclick=()=>reqAct(p,"wait");
+    wrap.appendChild(card);
+  });
+  updateNavDots();
+}
+async function reqAct(p,kind){
+  try{
+    if(kind==="approved") await sb.from("profiles").update({status:"approved",request_seen:true}).eq("id",p.id);
+    else if(kind==="denied") await sb.from("profiles").update({status:"denied",request_seen:true}).eq("id",p.id);
+    else await sb.from("profiles").update({request_seen:true}).eq("id",p.id);   // "wait"
+  }catch(e){ toast("Couldn't update — try again"); return; }
+  toast(kind==="approved"?"Approved":kind==="denied"?"Denied":"Kept pending");
+  await refreshRequests(); renderView();
+}
+
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
   c.appendChild(el(`<p class="page-sub">Manage banners, accounts and content.</p>`));
