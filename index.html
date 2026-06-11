@@ -112,6 +112,7 @@ img{display:block}
 .filters{display:inline-flex;background:#0d1015;border-radius:12px;padding:4px;gap:3px;border:1px solid var(--line);box-shadow:inset 0 1px 2px rgba(0,0,0,.5);flex-wrap:wrap}
 .chip{border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted)}
 .chip.active{background:linear-gradient(180deg,#23272f,#181b21);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.chip-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);margin-left:7px;vertical-align:middle}
 .lib-search,.lib-sort{background:#0c0f14;border:1px solid var(--line-2);color:var(--text);border-radius:11px;padding:8px 12px;font-size:13.5px;font-family:inherit}
 .lib-search{min-width:150px} .lib-search:focus,.lib-sort:focus{outline:none;border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px}
@@ -338,7 +339,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "3.4";
+const APP_VERSION       = "3.5";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -819,7 +820,7 @@ function footerNode(){
   </footer>`);
 }
 
-function navTabs(){ const t=["dashboard","upload","library","albums","settings"]; if(state.isAdmin){ t.push("admin"); t.push("approvals"); } return t; }
+function navTabs(){ const t=["dashboard","upload","library","albums","settings"]; if(state.isAdmin) t.push("admin"); return t; }
 function renderShell(){
   app.innerHTML="";
   app.appendChild(el(`<div class="topbar"><div class="topbar-in">
@@ -839,7 +840,7 @@ function updateNavDots(){
   const nav=$("#nav"); if(!nav) return;
   const up=nav.querySelector('button[data-tab="upload"]');
   if(up){ let dot=up.querySelector(".dot"); if(uploadsActive()){ if(!dot) up.appendChild(el(`<span class="dot"></span>`)); } else if(dot){ dot.remove(); } }
-  const ap=nav.querySelector('button[data-tab="approvals"]');
+  const ap=nav.querySelector('button[data-tab="admin"]');
   if(ap){ let dot=ap.querySelector(".dot"); if((state.pendingUnseen||0)>0){ if(!dot) ap.appendChild(el(`<span class="dot"></span>`)); } else if(dot){ dot.remove(); } }
 }
 function renderView(){
@@ -850,7 +851,6 @@ function renderView(){
   else if(state.view==="albums") renderAlbums(c);
   else if(state.view==="settings") renderSettings(c);
   else if(state.view==="admin") renderAdmin(c);
-  else if(state.view==="approvals") renderApprovals(c);
   else renderLibrary(c);
   updateNavDots();
 }
@@ -1525,11 +1525,9 @@ function selfDeleteFlow(){
 }
 
 /* ============================================================ ADMIN */
-async function renderApprovals(c){
-  if(!state.isAdmin){ c.appendChild(el(`<div class="empty"><div class="big">Not available</div></div>`)); return; }
-  c.appendChild(el(`<h1 class="page-h">Approvals</h1>`));
-  c.appendChild(el(`<p class="page-sub">New accounts waiting to join. <b>Approve</b> lets them in, <b>Deny</b> refuses them (they can ask again), <b>Wait</b> keeps it pending and just clears the notification.</p>`));
-  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); c.appendChild(wrap);
+async function adminApprovals(host){
+  host.appendChild(el(`<p class="page-sub" style="margin-top:0">New accounts waiting to join. <b>Approve</b> lets them in, <b>Deny</b> refuses them (they can ask again), <b>Hold</b> keeps it pending and just clears the notification.</p>`));
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
   await refreshRequests();
   wrap.innerHTML="";
   const reqs=state.requests||[];
@@ -1543,7 +1541,7 @@ async function renderApprovals(c){
       <div class="req-actions">
         <button class="btn-sm req-ok">${IC.check} Approve</button>
         <button class="btn-sm del req-no">${IC.x} Deny</button>
-        <button class="btn-sm req-wait">Wait</button>
+        <button class="btn-sm req-wait">Hold</button>
       </div></div>`);
     card.querySelector(".req-ok").onclick=()=>reqAct(p,"approved");
     card.querySelector(".req-no").onclick=()=>reqAct(p,"denied");
@@ -1556,17 +1554,30 @@ async function reqAct(p,kind){
   try{
     if(kind==="approved") await sb.from("profiles").update({status:"approved",request_seen:true}).eq("id",p.id);
     else if(kind==="denied") await sb.from("profiles").update({status:"denied",request_seen:true}).eq("id",p.id);
-    else await sb.from("profiles").update({request_seen:true}).eq("id",p.id);   // "wait"
+    else await sb.from("profiles").update({request_seen:true}).eq("id",p.id);   // "hold"
   }catch(e){ toast("Couldn't update — try again"); return; }
-  toast(kind==="approved"?"Approved":kind==="denied"?"Denied":"Kept pending");
+  toast(kind==="approved"?"Approved":kind==="denied"?"Denied":"On hold");
   await refreshRequests(); renderView();
 }
 
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
-  c.appendChild(el(`<p class="page-sub">Manage banners, accounts and content.</p>`));
-
-  /* --- banners --- */
+  if(!state.adminTab) state.adminTab="banner";
+  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"]];
+  const bar=el(`<div class="filters" style="margin-bottom:18px"></div>`);
+  tabs.forEach(([k,label])=>{
+    const b=el(`<button class="chip ${state.adminTab===k?"active":""}" data-k="${k}">${label}</button>`);
+    if(k==="approvals" && (state.pendingUnseen||0)>0) b.appendChild(el(`<span class="chip-dot"></span>`));
+    b.onclick=()=>{ state.adminTab=k; renderView(); };
+    bar.appendChild(b);
+  });
+  c.appendChild(bar);
+  const host=el(`<div></div>`); c.appendChild(host);
+  if(state.adminTab==="banner") adminBanner(host);
+  else if(state.adminTab==="approvals") await adminApprovals(host);
+  else await adminAccounts(host);
+}
+function adminBanner(host){
   const bwrap=el(`<div class="admin-card"><div class="section-h"><h3>Entry banner</h3></div>
     <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 14px">Shown once to every member when they open the site. You can attach a photo or video.</p>
     <div class="field"><label>Title (optional)</label><input id="bnTitle" maxlength="120" placeholder="Announcement title"></div>
@@ -1575,12 +1586,11 @@ async function renderAdmin(c){
     <div class="msg" id="bnMsg"></div>
     <button class="btn btn-blue" id="bnPublish" style="width:auto;padding:11px 22px">Publish banner</button>
     <div id="bnList" style="margin-top:18px"></div></div>`);
-  c.appendChild(bwrap);
+  host.appendChild(bwrap);
   bindBannerManager(bwrap);
-
-  /* --- accounts --- */
-  c.appendChild(el(`<div class="section-h"><h3>Accounts</h3></div>`));
-  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); c.appendChild(wrap);
+}
+async function adminAccounts(host){
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
   let profiles=[], media=[];
   try{ const p=await sb.from("profiles").select("*").order("created_at",{ascending:true}); profiles=p.data||[]; }catch(e){}
   try{ const m=await sb.from("media").select("*").order("created_at",{ascending:false}); media=m.data||[]; }catch(e){}
@@ -1591,7 +1601,7 @@ async function renderAdmin(c){
     const mine=byUser[p.id]||[];
     const used=mine.reduce((s,m)=>s+(m.size||0),0);
     const isSelf=p.id===state.user.id;
-    const tag=p.is_admin?`<span class="tag"> · owner</span>`:(p.banned?`<span class="tag ban"> · banned</span>`:"");
+    const tag=p.is_admin?`<span class="tag"> · owner</span>`:(p.banned?`<span class="tag ban"> · banned</span>`:(p.status==="pending"?`<span class="tag"> · pending</span>`:(p.status==="denied"?`<span class="tag ban"> · denied</span>`:"")));
     const card=el(`<div class="admin-user">
       <div class="ahead"><div><div class="an">${esc(p.username||"(no name)")}${tag}</div><div class="ae">${esc(p.email||"")}</div></div>
         <div class="acount">${mine.length} item${mine.length!==1?"s":""} · ${fmtBytes(used)}</div></div></div>`);
