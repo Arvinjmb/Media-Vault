@@ -131,6 +131,16 @@ img{display:block}
 .lg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
 .lg-dot.used{background:var(--accent)} .lg-dot.free{background:#0c0f14;border:1px solid var(--line-2)}
 .lg-total{font-size:12px;color:var(--muted);margin-top:8px}
+.plan-badge{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:5px 12px;border-radius:999px}
+.plan-badge.free{background:#0c0f14;border:1px solid var(--line-2);color:var(--muted)}
+.plan-badge.paid{background:var(--accent);color:#06121f}
+.sub-stats{display:flex;justify-content:center;gap:26px;margin-top:16px}
+.sub-stat .v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.sub-stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+.seg{display:flex;gap:6px;background:#0c0f14;border:1px solid var(--line-2);border-radius:12px;padding:4px}
+.seg-b{flex:1;padding:9px 0;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted);background:transparent}
+.seg-b.active{background:linear-gradient(180deg,#23272f,#181b21);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sub-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .lib-search,.lib-sort{background:#0c0f14;border:1px solid var(--line-2);color:var(--text);border-radius:11px;padding:8px 12px;font-size:13.5px;font-family:inherit}
 .lib-search{min-width:150px} .lib-search:focus,.lib-sort:focus{outline:none;border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px}
@@ -357,7 +367,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "3.7";
+const APP_VERSION       = "3.8";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -708,11 +718,20 @@ function renderRecovery(){
 }
 
 /* ============================================================ LOAD */
+function subInfo(plan, sub_start, sub_days){
+  if(plan!=="paid" || !sub_start || !sub_days) return { paid:false };
+  const day=86400000, start=new Date(sub_start).getTime();
+  const total=sub_days*day, usedMs=Date.now()-start, leftMs=total-usedMs;
+  return { paid:true, days:sub_days,
+    left:Math.max(0,Math.ceil(leftMs/day)),
+    used:Math.max(0,Math.min(sub_days,Math.floor(usedMs/day))),
+    ended:leftMs<=0 };
+}
 async function loadAndShow(){
   app.innerHTML=splashHTML();
   state.uploads=[]; state.albumView=null; _uploadRunning=0;   // start clean for this account
   let prof=null;
-  try{ const r=await sb.from("profiles").select("is_admin,banned,status,request_seen").eq("id",state.user.id).single(); prof=r.data; }catch(e){ prof=null; }
+  try{ const r=await sb.from("profiles").select("is_admin,banned,status,request_seen,plan,sub_start,sub_days").eq("id",state.user.id).single(); prof=r.data; }catch(e){ prof=null; }
   if(!prof || prof.banned){
     await sb.auth.signOut();
     state.user=null; state.items=[]; state.albums=[]; state.isAdmin=false;
@@ -722,7 +741,17 @@ async function loadAndShow(){
   }
   state.isAdmin=!!prof.is_admin;
   state.myStatus=prof.status||"approved";
-  if(!state.isAdmin && state.myStatus!=="approved"){ renderGate(state.myStatus); return; }
+  state.myPlan=prof.plan||"free"; state.subStart=prof.sub_start||null; state.subDays=prof.sub_days||null;
+  if(!state.isAdmin){
+    if(state.myStatus!=="approved"){ renderGate(state.myStatus); return; }
+    const si=subInfo(state.myPlan,state.subStart,state.subDays);
+    if(si.paid && si.ended){ renderSubEnded(); return; }
+    if(si.paid && si.left<=3){ renderSubWarning(si.left, enterApp); return; }
+  }
+  await enterApp();
+}
+async function enterApp(){
+  app.innerHTML=splashHTML();
   try{
     const { data,error }=await sb.from("media").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false});
     state.items=error?[]:(data||[]);
@@ -735,6 +764,34 @@ async function loadAndShow(){
   await refreshRequests();
   state.view="dashboard"; renderShell();
   maybeShowBanner();
+}
+/* subscription ended — blocks entry */
+function renderSubEnded(){
+  app.innerHTML="";
+  const card=el(`<div class="gate-wrap"><div class="gate-card">
+    <div class="gate-badge">${vaultLogo(46,"top")}</div>
+    <h1>Your subscription has ended</h1>
+    <p>Your access has expired. Please message the admin to renew your subscription.</p>
+    <div class="gate-actions"><button class="btn btn-blue" id="gCheck">Check again</button>
+      <button class="btn btn-metal" id="gOut">${IC.out} Sign out</button></div>
+  </div></div>`);
+  app.appendChild(card);
+  card.querySelector("#gCheck").onclick=()=>loadAndShow();
+  card.querySelector("#gOut").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
+}
+/* shown every entry when 3 or fewer days remain */
+function renderSubWarning(left, onContinue){
+  app.innerHTML="";
+  const card=el(`<div class="gate-wrap"><div class="gate-card">
+    <div class="gate-badge">${vaultLogo(46,"top")}</div>
+    <h1>Your subscription ends soon</h1>
+    <p>You have <b>${left} day${left===1?"":"s"}</b> left. Message the admin to renew so you don't lose access.</p>
+    <div class="gate-actions"><button class="btn btn-blue" id="gGo">Continue</button>
+      <button class="btn btn-metal" id="gOut">${IC.out} Sign out</button></div>
+  </div></div>`);
+  app.appendChild(card);
+  card.querySelector("#gGo").onclick=()=>onContinue();
+  card.querySelector("#gOut").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
 }
 /* approval gate shown to members who aren't approved yet */
 function renderGate(kind){
@@ -838,7 +895,7 @@ function footerNode(){
   </footer>`);
 }
 
-function navTabs(){ const t=["dashboard","upload","library","albums","settings"]; if(state.isAdmin) t.push("admin"); return t; }
+function navTabs(){ const t=["dashboard","upload","library","albums"]; if(!state.isAdmin) t.push("subscription"); t.push("settings"); if(state.isAdmin) t.push("admin"); return t; }
 function renderShell(){
   app.innerHTML="";
   app.appendChild(el(`<div class="topbar"><div class="topbar-in">
@@ -847,7 +904,7 @@ function renderShell(){
   </div></div>`));
   app.appendChild(el(`<div class="shell"><div class="nav" id="nav"></div><div id="content"></div></div>`));
   const nav=$("#nav");
-  const LBL={dashboard:"Dashboard",upload:"Upload",library:"Library",albums:"Albums",settings:"Settings",admin:"Control",approvals:"Approvals"};
+  const LBL={dashboard:"Dashboard",upload:"Upload",library:"Library",albums:"Albums",settings:"Settings",admin:"Control",approvals:"Approvals",subscription:"Subscription"};
   navTabs().forEach(v=>{ const b=el(`<button data-tab="${v}" class="${v===state.view?"active":""}">${LBL[v]||v}</button>`); b.onclick=()=>{ if(v!=="albums") state.albumView=null; state.view=v; renderView(); }; nav.appendChild(b); });
   $("#logout").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
   $(".shell").appendChild(footerNode());
@@ -869,6 +926,7 @@ function renderView(){
   else if(state.view==="albums") renderAlbums(c);
   else if(state.view==="settings") renderSettings(c);
   else if(state.view==="admin") renderAdmin(c);
+  else if(state.view==="subscription") renderSubscription(c);
   else renderLibrary(c);
   updateNavDots();
 }
@@ -1561,7 +1619,7 @@ async function adminApprovals(host){
         <button class="btn-sm del req-no">${IC.x} Deny</button>
         <button class="btn-sm req-wait">Hold</button>
       </div></div>`);
-    card.querySelector(".req-ok").onclick=()=>reqAct(p,"approved");
+    card.querySelector(".req-ok").onclick=()=>approveFlow(p);
     card.querySelector(".req-no").onclick=()=>reqAct(p,"denied");
     card.querySelector(".req-wait").onclick=()=>reqAct(p,"wait");
     wrap.appendChild(card);
@@ -1578,10 +1636,112 @@ async function reqAct(p,kind){
   await refreshRequests(); renderView();
 }
 
+function renderSubscription(c){
+  c.appendChild(el(`<h1 class="page-h">Subscription</h1>`));
+  const si=subInfo(state.myPlan,state.subStart,state.subDays);
+  if(!si.paid){
+    c.appendChild(el(`<div class="admin-card" style="max-width:520px;text-align:center">
+      <div class="plan-badge free">Free plan</div>
+      <h3 style="margin:14px 0 6px">You're using the free plan</h3>
+      <p style="color:var(--muted);font-size:14px;margin:0">You have full access with your shared storage space. If you'd like a paid plan, message the admin.</p></div>`));
+  }else{
+    c.appendChild(el(`<div class="admin-card" style="max-width:520px;text-align:center">
+      <div class="plan-badge paid">Paid plan</div>
+      <div class="sub-stats">
+        <div class="sub-stat"><div class="v">${si.left}</div><div class="l">day${si.left===1?"":"s"} left</div></div>
+        <div class="sub-stat"><div class="v">${si.used}</div><div class="l">day${si.used===1?"":"s"} used</div></div>
+        <div class="sub-stat"><div class="v">${si.days}</div><div class="l">total days</div></div></div>
+      <div class="bar" style="margin:14px 0 0"><i style="width:${si.days?Math.min(100,si.used/si.days*100):0}%"></i></div>
+      ${si.left<=3?`<div style="color:var(--accent);font-size:13px;font-weight:700;margin-top:10px">Ending soon — message the admin to renew.</div>`:""}</div>`));
+  }
+  const used=myUsedBytes(), cap=myCapBytes(), free=Math.max(0,cap-used), pct=cap>0?Math.min(100,used/cap*100):0;
+  const pctStr=pct===0?"0":(pct<10?pct.toFixed(1):String(Math.round(pct)));
+  c.appendChild(el(`<div class="admin-card" style="max-width:520px">
+    <div class="section-h"><h3>Your storage</h3></div>
+    <div class="bar" style="margin:2px 0 10px"><i style="width:${pct}%"></i></div>
+    <div style="font-size:13px;color:var(--muted)">${fmtBytes(used)} of ${fmtBytes(cap)} used · ${pctStr}% · ${fmtBytes(free)} free</div></div>`));
+}
+function daysPrompt(title, initial, cb){
+  const { bg, close }=overlay({});
+  const sheet=el(`<div class="sheet"><h2>${esc(title)}</h2>
+    <div class="field"><label>Number of days</label><input id="dpDays" type="number" min="1" max="3650" value="${initial||30}" inputmode="numeric"></div>
+    <div class="sheet-actions"><button class="btn btn-metal" id="dpC">Cancel</button><button class="btn btn-blue" id="dpOk">Confirm</button></div></div>`);
+  bg.appendChild(sheet);
+  setTimeout(()=>sheet.querySelector("#dpDays").focus(),60);
+  const ok=()=>{ const n=parseInt(sheet.querySelector("#dpDays").value,10); if(!n||n<1) return; close(); cb(n); };
+  sheet.querySelector("#dpC").onclick=close;
+  sheet.querySelector("#dpOk").onclick=ok;
+  sheet.querySelector("#dpDays").addEventListener("keydown",e=>{ if(e.key==="Enter") ok(); });
+}
+function approveFlow(p){
+  const { bg, close }=overlay({});
+  const sheet=el(`<div class="sheet"><h2>Approve ${esc(p.username||"account")}</h2>
+    <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 14px">Choose a plan for this member.</p>
+    <div class="seg"><button class="seg-b active" data-p="free">Free</button><button class="seg-b" data-p="paid">Paid</button></div>
+    <div class="field" id="apDaysWrap" style="display:none;margin-top:14px"><label>Paid days</label><input id="apDays" type="number" min="1" max="3650" value="30" inputmode="numeric"></div>
+    <div class="sheet-actions"><button class="btn btn-metal" id="apC">Cancel</button><button class="btn btn-blue" id="apGo">Approve</button></div></div>`);
+  bg.appendChild(sheet);
+  let plan="free";
+  sheet.querySelectorAll(".seg-b").forEach(b=>b.onclick=()=>{ plan=b.dataset.p; sheet.querySelectorAll(".seg-b").forEach(x=>x.classList.toggle("active",x===b)); sheet.querySelector("#apDaysWrap").style.display=plan==="paid"?"block":"none"; });
+  sheet.querySelector("#apC").onclick=close;
+  sheet.querySelector("#apGo").onclick=async()=>{
+    const upd={ status:"approved", request_seen:true, plan };
+    if(plan==="paid"){ const n=parseInt(sheet.querySelector("#apDays").value,10); if(!n||n<1) return; upd.sub_start=new Date().toISOString(); upd.sub_days=n; }
+    else { upd.sub_start=null; upd.sub_days=null; }
+    sheet.querySelector("#apGo").disabled=true;
+    try{ await sb.from("profiles").update(upd).eq("id",p.id); }catch(e){ toast("Couldn't approve"); close(); return; }
+    close(); toast(plan==="paid"?"Approved · paid":"Approved · free");
+    await refreshRequests(); renderView();
+  };
+}
+async function subSetPaid(p,days){
+  try{ await sb.from("profiles").update({plan:"paid", sub_start:new Date().toISOString(), sub_days:days}).eq("id",p.id); }
+  catch(e){ toast("Couldn't update"); return; }
+  toast("Set to paid"); renderView();
+}
+async function subSetFree(p){
+  try{ await sb.from("profiles").update({plan:"free", sub_start:null, sub_days:null}).eq("id",p.id); }
+  catch(e){ toast("Couldn't update"); return; }
+  toast("Moved to free"); renderView();
+}
+async function adminSubscription(host){
+  if(!state.subTab) state.subTab="free";
+  const toggle=el(`<div class="filters" style="margin-bottom:16px">
+    <button class="chip ${state.subTab==="free"?"active":""}" data-s="free">Free</button>
+    <button class="chip ${state.subTab==="paid"?"active":""}" data-s="paid">Paid</button></div>`);
+  host.appendChild(toggle);
+  toggle.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ state.subTab=b.dataset.s; renderView(); });
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
+  let profiles=[];
+  try{ const p=await sb.from("profiles").select("*").eq("is_admin",false).order("created_at",{ascending:true}); profiles=p.data||[]; }catch(e){}
+  wrap.innerHTML="";
+  const isPaidTab=state.subTab==="paid";
+  const list=profiles.filter(p=> isPaidTab ? p.plan==="paid" : p.plan!=="paid");
+  if(!list.length){ wrap.appendChild(el(`<div class="empty"><div class="big">${isPaidTab?"No paid members":"No free members"}</div><div>${isPaidTab?"Move a member here from Free to start a paid plan.":"Everyone is on a paid plan right now."}</div></div>`)); return; }
+  list.forEach(p=>{
+    const si=subInfo(p.plan,p.sub_start,p.sub_days);
+    const card=el(`<div class="admin-card">
+      <div class="ahead" style="cursor:default"><div><div class="an">${esc(p.username||"(no name)")}</div><div class="ae">${esc(p.email||"")}</div></div>
+        ${isPaidTab&&si.paid?`<div class="acount">${si.left} day${si.left===1?"":"s"} left</div>`:""}</div>
+      ${isPaidTab&&si.paid?`<div class="ustore-t" style="margin-top:8px">${si.used} of ${si.days} days used${si.ended?" · ended":""}</div>`:""}
+      <div class="sub-acts"></div></div>`);
+    const acts=card.querySelector(".sub-acts");
+    if(isPaidTab){
+      const setB=el(`<button class="btn-sm">Set days</button>`); setB.onclick=()=>daysPrompt("Set paid days", p.sub_days||30, n=>subSetPaid(p,n));
+      const freeB=el(`<button class="btn-sm">Move to Free</button>`); freeB.onclick=()=>subSetFree(p);
+      acts.appendChild(setB); acts.appendChild(freeB);
+    }else{
+      const paidB=el(`<button class="btn-sm">Move to Paid</button>`); paidB.onclick=()=>daysPrompt("Set paid days", 30, n=>subSetPaid(p,n));
+      acts.appendChild(paidB);
+    }
+    wrap.appendChild(card);
+  });
+}
+
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
   if(!state.adminTab) state.adminTab="banner";
-  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["storage","Storage"]];
+  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["storage","Storage"],["subscription","Subscription"]];
   const bar=el(`<div class="filters" style="margin-bottom:18px"></div>`);
   tabs.forEach(([k,label])=>{
     const b=el(`<button class="chip ${state.adminTab===k?"active":""}" data-k="${k}">${label}</button>`);
@@ -1594,7 +1754,8 @@ async function renderAdmin(c){
   if(state.adminTab==="banner") adminBanner(host);
   else if(state.adminTab==="approvals") await adminApprovals(host);
   else if(state.adminTab==="accounts") await adminAccounts(host);
-  else await adminStorage(host);
+  else if(state.adminTab==="storage") await adminStorage(host);
+  else await adminSubscription(host);
 }
 async function adminStorage(host){
   const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
@@ -1667,7 +1828,8 @@ async function adminAccounts(host){
         <div class="ahead"><div><div class="an">${esc(p.username||"(no name)")}${tag}</div><div class="ae">${esc(p.email||"")}</div></div>
           <div class="acount">${mine.length} item${mine.length!==1?"s":""}</div></div>
         <div class="ustore"><div class="bar"><i style="width:${pct}%"></i></div>
-          <div class="ustore-t">${fmtBytes(used)} of ${fmtBytes(cap)} used · ${pctTxt(pct)}% · ${fmtBytes(free)} free</div></div></div>`);
+          <div class="ustore-t">${fmtBytes(used)} of ${fmtBytes(cap)} used · ${pctTxt(pct)}% · ${fmtBytes(free)} free</div></div>
+        ${!p.is_admin?`<div class="ustore-t" style="margin-top:6px">${(()=>{const si=subInfo(p.plan,p.sub_start,p.sub_days);return si.paid?`Paid · ${si.left} day${si.left===1?"":"s"} left (${si.used}/${si.days} used)`:"Free plan";})()}</div>`:""}</div>`);
       if(!isSelf){
         const act=el(`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="btn-sm aban">${p.banned?"Unban":"Ban"}</button>
