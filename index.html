@@ -118,6 +118,19 @@ img{display:block}
 .ustore{margin-top:12px}
 .ustore .bar{height:7px}
 .ustore-t{font-size:12.5px;color:var(--muted);margin-top:6px}
+.storage-card{max-width:520px;text-align:center}
+.donut-wrap{position:relative;width:180px;height:180px;margin:6px auto 2px}
+.donut{width:180px;height:180px;display:block}
+.donut-track{fill:none;stroke:#0c0f14;stroke-width:18}
+.donut-val{fill:none;stroke:var(--accent);stroke-width:18;stroke-linecap:round;transition:stroke-dasharray .5s ease}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut-pct{font-size:34px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.donut-sub{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.donut-legend{display:flex;justify-content:center;gap:22px;margin-top:14px;flex-wrap:wrap}
+.donut-legend .lg{font-size:13.5px;color:var(--muted)} .donut-legend .lg b{color:var(--text)}
+.lg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.lg-dot.used{background:var(--accent)} .lg-dot.free{background:#0c0f14;border:1px solid var(--line-2)}
+.lg-total{font-size:12px;color:var(--muted);margin-top:8px}
 .lib-search,.lib-sort{background:#0c0f14;border:1px solid var(--line-2);color:var(--text);border-radius:11px;padding:8px 12px;font-size:13.5px;font-family:inherit}
 .lib-search{min-width:150px} .lib-search:focus,.lib-sort:focus{outline:none;border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px}
@@ -344,7 +357,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "3.6";
+const APP_VERSION       = "3.7";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -1568,7 +1581,7 @@ async function reqAct(p,kind){
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
   if(!state.adminTab) state.adminTab="banner";
-  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"]];
+  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["storage","Storage"]];
   const bar=el(`<div class="filters" style="margin-bottom:18px"></div>`);
   tabs.forEach(([k,label])=>{
     const b=el(`<button class="chip ${state.adminTab===k?"active":""}" data-k="${k}">${label}</button>`);
@@ -1580,7 +1593,35 @@ async function renderAdmin(c){
   const host=el(`<div></div>`); c.appendChild(host);
   if(state.adminTab==="banner") adminBanner(host);
   else if(state.adminTab==="approvals") await adminApprovals(host);
-  else await adminAccounts(host);
+  else if(state.adminTab==="accounts") await adminAccounts(host);
+  else await adminStorage(host);
+}
+async function adminStorage(host){
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
+  await refreshStats();
+  const total=MEMBER_POOL_GB*GB;
+  const used=Math.min(Math.max(0,memberUsed()), total);
+  const free=Math.max(0,total-used);
+  const pct=total>0?Math.min(100,used/total*100):0;
+  const pctStr=pct===0?"0":(pct<10?pct.toFixed(1):String(Math.round(pct)));
+  const r=70, C=2*Math.PI*r, dash=(pct/100)*C;
+  wrap.innerHTML="";
+  wrap.appendChild(el(`<div class="admin-card storage-card">
+    <div class="section-h"><h3>Users' storage</h3></div>
+    <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 16px">Shared space across all members — used vs free of ${MEMBER_POOL_GB} GB total.</p>
+    <div class="donut-wrap">
+      <svg viewBox="0 0 180 180" class="donut" aria-hidden="true">
+        <circle cx="90" cy="90" r="${r}" class="donut-track"></circle>
+        <circle cx="90" cy="90" r="${r}" class="donut-val" stroke-dasharray="${dash} ${C}" transform="rotate(-90 90 90)"></circle>
+      </svg>
+      <div class="donut-center"><div class="donut-pct">${pctStr}%</div><div class="donut-sub">used</div></div>
+    </div>
+    <div class="donut-legend">
+      <div class="lg"><span class="lg-dot used"></span>Used · <b>${fmtBytes(used)}</b></div>
+      <div class="lg"><span class="lg-dot free"></span>Free · <b>${fmtBytes(free)}</b></div>
+    </div>
+    <div class="lg-total">of ${MEMBER_POOL_GB} GB total</div>
+  </div>`));
 }
 function adminBanner(host){
   const bwrap=el(`<div class="admin-card"><div class="section-h"><h3>Entry banner</h3></div>
