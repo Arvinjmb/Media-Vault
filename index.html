@@ -367,7 +367,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "3.8";
+const APP_VERSION       = "3.9";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -801,10 +801,10 @@ function renderGate(kind){
     <div class="gate-badge">${vaultLogo(46,"top")}</div>
     <h1>${denied?"Request not approved":"Waiting for approval"}</h1>
     <p>${denied
-      ? "The owner didn't approve this request. You can ask again whenever you like — your email stays the same."
+      ? "The owner declined this request, so this email can't be used to join. Please reach out to the owner directly if you think this was a mistake."
       : "Your account is created and is waiting for the owner to approve it. You'll get in as soon as it's approved — you can check back anytime."}</p>
     <div class="gate-actions">
-      ${denied?`<button class="btn btn-blue" id="gAgain">Request again</button>`:`<button class="btn btn-blue" id="gCheck">Check again</button>`}
+      ${denied?"":`<button class="btn btn-blue" id="gCheck">Check again</button>`}
       <button class="btn btn-metal" id="gOut">${IC.out} Sign out</button>
     </div>
     <div class="msg" id="gMsg"></div>
@@ -812,11 +812,6 @@ function renderGate(kind){
   app.appendChild(card);
   card.querySelector("#gOut").onclick=async()=>{ cacheClear(); await sb.auth.signOut(); };
   const check=card.querySelector("#gCheck"); if(check) check.onclick=()=>loadAndShow();
-  const again=card.querySelector("#gAgain"); if(again) again.onclick=async()=>{
-    again.disabled=true;
-    try{ await sb.from("profiles").update({status:"pending",request_seen:false}).eq("id",state.user.id); }catch(e){}
-    state.myStatus="pending"; renderGate("pending");
-  };
 }
 async function refreshRequests(){
   if(!state.isAdmin){ state.requests=[]; state.pendingUnseen=0; return; }
@@ -1602,7 +1597,7 @@ function selfDeleteFlow(){
 
 /* ============================================================ ADMIN */
 async function adminApprovals(host){
-  host.appendChild(el(`<p class="page-sub" style="margin-top:0">New accounts waiting to join. <b>Approve</b> lets them in, <b>Deny</b> refuses them (they can ask again), <b>Hold</b> keeps it pending and just clears the notification.</p>`));
+  host.appendChild(el(`<p class="page-sub" style="margin-top:0">New accounts waiting to join. <b>Approve</b> lets them in, <b>Deny</b> refuses them and bans their email (they can't ask again), <b>Hold</b> keeps it pending and just clears the notification.</p>`));
   const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
   await refreshRequests();
   wrap.innerHTML="";
@@ -1629,10 +1624,10 @@ async function adminApprovals(host){
 async function reqAct(p,kind){
   try{
     if(kind==="approved") await sb.from("profiles").update({status:"approved",request_seen:true}).eq("id",p.id);
-    else if(kind==="denied") await sb.from("profiles").update({status:"denied",request_seen:true}).eq("id",p.id);
+    else if(kind==="denied") await sb.from("profiles").update({status:"denied",banned:true,request_seen:true}).eq("id",p.id);
     else await sb.from("profiles").update({request_seen:true}).eq("id",p.id);   // "hold"
   }catch(e){ toast("Couldn't update — try again"); return; }
-  toast(kind==="approved"?"Approved":kind==="denied"?"Denied":"On hold");
+  toast(kind==="approved"?"Approved":kind==="denied"?"Denied — email banned":"On hold");
   await refreshRequests(); renderView();
 }
 
@@ -1741,7 +1736,7 @@ async function adminSubscription(host){
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
   if(!state.adminTab) state.adminTab="banner";
-  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["storage","Storage"],["subscription","Subscription"]];
+  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["banned","Banned"],["storage","Storage"],["subscription","Subscription"]];
   const bar=el(`<div class="filters" style="margin-bottom:18px"></div>`);
   tabs.forEach(([k,label])=>{
     const b=el(`<button class="chip ${state.adminTab===k?"active":""}" data-k="${k}">${label}</button>`);
@@ -1754,8 +1749,25 @@ async function renderAdmin(c){
   if(state.adminTab==="banner") adminBanner(host);
   else if(state.adminTab==="approvals") await adminApprovals(host);
   else if(state.adminTab==="accounts") await adminAccounts(host);
+  else if(state.adminTab==="banned") await adminBanned(host);
   else if(state.adminTab==="storage") await adminStorage(host);
   else await adminSubscription(host);
+}
+async function adminBanned(host){
+  host.appendChild(el(`<p class="page-sub" style="margin-top:0">Emails you've banned. Denying a request bans the email automatically. <b>Unban</b> clears the ban and puts the email back in the approval queue.</p>`));
+  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
+  let profiles=[];
+  try{ const p=await sb.from("profiles").select("id,username,email,created_at,banned").eq("banned",true).order("created_at",{ascending:true}); profiles=p.data||[]; }catch(e){}
+  wrap.innerHTML="";
+  if(!profiles.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No banned emails</div><div>When you deny a request, that email lands here.</div></div>`)); return; }
+  profiles.forEach(p=>{
+    const card=el(`<div class="admin-card">
+      <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}</div>
+        <div class="ae">${esc(p.email||"")}</div></div></div>
+      <div class="req-actions"><button class="btn-sm bun">Unban</button></div></div>`);
+    card.querySelector(".bun").onclick=()=>adminSetBanned(p.id,false);
+    wrap.appendChild(card);
+  });
 }
 async function adminStorage(host){
   const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
@@ -1943,8 +1955,10 @@ function editBannerFlow(b, refresh){
 }
 
 async function adminSetBanned(userId,banned){
-  try{ await sb.from("profiles").update({banned}).eq("id",userId); }catch(e){}
-  renderView();
+  const patch = banned ? {banned:true} : {banned:false,status:"pending",request_seen:false};
+  try{ await sb.from("profiles").update(patch).eq("id",userId); }catch(e){ toast("Couldn't update — try again"); return; }
+  toast(banned?"Banned":"Unbanned — back in approvals");
+  await refreshRequests(); renderView();
 }
 function adminDeleteFlow(p,mine){
   let n=1;
