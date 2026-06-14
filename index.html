@@ -367,7 +367,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "3.9";
+const APP_VERSION       = "4.0";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -1602,8 +1602,8 @@ async function adminApprovals(host){
   await refreshRequests();
   wrap.innerHTML="";
   const reqs=state.requests||[];
-  if(!reqs.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No pending requests</div><div>When someone signs up, they'll appear here for you to approve.</div></div>`)); updateNavDots(); return; }
-  reqs.forEach(p=>{
+  if(!reqs.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No pending requests</div><div>When someone signs up, they'll appear here for you to approve.</div></div>`)); }
+  else reqs.forEach(p=>{
     const isNew=!p.request_seen;
     const card=el(`<div class="admin-card req${isNew?" req-new":""}">
       <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}${isNew?`<span class="req-badge">new</span>`:""}</div>
@@ -1620,6 +1620,40 @@ async function adminApprovals(host){
     wrap.appendChild(card);
   });
   updateNavDots();
+
+  /* ---- Approved / Denied browser ---- */
+  if(!state.apprTab) state.apprTab="approved";
+  host.appendChild(el(`<div class="acct-head" style="margin-top:22px"><span class="acct-count">Decided accounts</span></div>`));
+  const toggle=el(`<div class="filters" style="margin:2px 0 14px">
+    <button class="chip ${state.apprTab==="approved"?"active":""}" data-s="approved">Approved</button>
+    <button class="chip ${state.apprTab==="denied"?"active":""}" data-s="denied">Denied</button></div>`);
+  host.appendChild(toggle);
+  toggle.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ state.apprTab=b.dataset.s; renderView(); });
+  const lwrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(lwrap);
+  let people=[];
+  try{ const r=await sb.from("profiles").select("id,username,email,created_at,status,is_admin").order("created_at",{ascending:true}); people=r.data||[]; }catch(e){}
+  lwrap.innerHTML="";
+  if(state.apprTab==="denied"){
+    const list=people.filter(p=>p.status==="denied");
+    if(!list.length){ lwrap.appendChild(el(`<div class="empty"><div class="big">No denied users</div><div>Denied requests appear here.</div></div>`)); return; }
+    list.forEach(p=>{
+      const card=el(`<div class="admin-card">
+        <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}</div>
+          <div class="ae">${esc(p.email||"")}</div></div></div>
+        <div class="req-actions"><button class="btn-sm rest">Restore to pending</button></div></div>`);
+      card.querySelector(".rest").onclick=()=>adminSetBanned(p.id,false);
+      lwrap.appendChild(card);
+    });
+  }else{
+    const list=people.filter(p=>(p.status||"approved")==="approved");
+    if(!list.length){ lwrap.appendChild(el(`<div class="empty"><div class="big">No approved users</div></div>`)); return; }
+    list.forEach(p=>{
+      const card=el(`<div class="admin-card">
+        <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}${p.is_admin?`<span class="tag"> · owner</span>`:""}</div>
+          <div class="ae">${esc(p.email||"")}</div></div></div></div>`);
+      lwrap.appendChild(card);
+    });
+  }
 }
 async function reqAct(p,kind){
   try{
@@ -1736,7 +1770,7 @@ async function adminSubscription(host){
 async function renderAdmin(c){
   c.appendChild(el(`<h1 class="page-h">Control</h1>`));
   if(!state.adminTab) state.adminTab="banner";
-  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["banned","Banned"],["storage","Storage"],["subscription","Subscription"]];
+  const tabs=[["banner","Banner"],["approvals","Approvals"],["accounts","Accounts"],["storage","Storage"],["subscription","Subscription"]];
   const bar=el(`<div class="filters" style="margin-bottom:18px"></div>`);
   tabs.forEach(([k,label])=>{
     const b=el(`<button class="chip ${state.adminTab===k?"active":""}" data-k="${k}">${label}</button>`);
@@ -1749,25 +1783,8 @@ async function renderAdmin(c){
   if(state.adminTab==="banner") adminBanner(host);
   else if(state.adminTab==="approvals") await adminApprovals(host);
   else if(state.adminTab==="accounts") await adminAccounts(host);
-  else if(state.adminTab==="banned") await adminBanned(host);
   else if(state.adminTab==="storage") await adminStorage(host);
   else await adminSubscription(host);
-}
-async function adminBanned(host){
-  host.appendChild(el(`<p class="page-sub" style="margin-top:0">Emails you've banned. Denying a request bans the email automatically. <b>Unban</b> clears the ban and puts the email back in the approval queue.</p>`));
-  const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
-  let profiles=[];
-  try{ const p=await sb.from("profiles").select("id,username,email,created_at,banned").eq("banned",true).order("created_at",{ascending:true}); profiles=p.data||[]; }catch(e){}
-  wrap.innerHTML="";
-  if(!profiles.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No banned emails</div><div>When you deny a request, that email lands here.</div></div>`)); return; }
-  profiles.forEach(p=>{
-    const card=el(`<div class="admin-card">
-      <div class="req-head"><div><div class="an">${esc(p.username||"(no name)")}</div>
-        <div class="ae">${esc(p.email||"")}</div></div></div>
-      <div class="req-actions"><button class="btn-sm bun">Unban</button></div></div>`);
-    card.querySelector(".bun").onclick=()=>adminSetBanned(p.id,false);
-    wrap.appendChild(card);
-  });
 }
 async function adminStorage(host){
   const wrap=el(`<div><div class="center-load"><div class="spin"></div></div></div>`); host.appendChild(wrap);
@@ -1821,11 +1838,12 @@ async function adminAccounts(host){
   const pctTxt=(v)=> v===0?"0":(v<10?v.toFixed(1):String(Math.round(v)));
   const draw=()=>{
     const term=((top.querySelector("#acctSearch")||{}).value||"").trim().toLowerCase();
-    const list=profiles.filter(p=>{
+    const visible=profiles.filter(p=>(p.status||"approved")!=="denied");
+    const list=visible.filter(p=>{
       if(!term) return true;
       return [p.username,p.first_name,p.last_name,p.email].filter(Boolean).join(" ").toLowerCase().includes(term);
     });
-    top.querySelector("#acctCount").textContent=`${profiles.length} user${profiles.length!==1?"s":""}${term?` · ${list.length} match${list.length!==1?"es":""}`:""}`;
+    top.querySelector("#acctCount").textContent=`${visible.length} user${visible.length!==1?"s":""}${term?` · ${list.length} match${list.length!==1?"es":""}`:""}`;
     wrap.innerHTML="";
     if(!list.length){ wrap.appendChild(el(`<div class="empty"><div class="big">No matches</div><div>No account matches “${esc(term)}”.</div></div>`)); return; }
     list.forEach(p=>{
