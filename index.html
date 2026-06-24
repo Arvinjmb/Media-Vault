@@ -506,7 +506,7 @@ const MAX_FILE_MB       = 95;    // per-file limit (uploads stream through the W
 const MIN_SHARE_MB      = 70;    // a member's share never drops below this; if it can't be met, new members wait for space
 const BANNER_BUCKET     = "banners";    // banners stay on Supabase (small, public)
 const UPLOAD_CONCURRENCY= 3;     // upload several large files at once = faster
-const APP_VERSION       = "4.4";
+const APP_VERSION       = "4.5";
 
 const OWNER = {
   name:"Arvin Jamebozorg",
@@ -910,10 +910,14 @@ async function enterApp(){
 /* subscription ended — blocks entry */
 function renderSubEnded(){
   app.innerHTML="";
+  const si=subInfo(state.myPlan,state.subStart,state.subDays);
+  const msg=si.paid
+    ? `Your access ended on <b>${si.endStr}</b> (started ${si.startStr}). Please message the admin to renew your subscription.`
+    : `Your access has expired. Please message the admin to renew your subscription.`;
   const card=el(`<div class="gate-wrap"><div class="gate-card">
     <div class="gate-badge">${vaultLogo(46,"top")}</div>
     <h1>Your subscription has ended</h1>
-    <p>Your access has expired. Please message the admin to renew your subscription.</p>
+    <p>${msg}</p>
     <div class="gate-actions"><button class="btn btn-blue" id="gCheck">Check again</button>
       <button class="btn btn-metal" id="gOut">${IC.out} Sign out</button></div>
   </div></div>`);
